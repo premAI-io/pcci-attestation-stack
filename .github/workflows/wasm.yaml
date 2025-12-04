@@ -4,10 +4,15 @@ jobs:
     clippy:
         strategy:
             matrix:
+                package: ["nvidia-attest", "prem-rs", "snp-attest"]
+                target: ["wasm32-unknown-unknown", "x86_64-unknown-linux-gnu"]
+                exclude:
+                    - package: prem-rs
+                      target: x86_64-unknown-linux-gnu
                 include:
-                    - target: wasm32-unknown-unknown
+                    - package: snp-attest
                       features: snp-attest/kds_async
-                    - target: x86_64-unknown-linux-gnu
+                    - package: snp-attest
                       features: snp-attest/kds_sync
         runs-on: ubuntu-latest
         steps:
@@ -16,4 +21,4 @@ jobs:
               with:
                   target: ${{ matrix.target }}
             - name: Run Clippy
-              run: cargo clippy --target=${{ matrix.target }} --features=${{ matrix.features }}
+              run: cargo clippy --package=${{ matrix.package }} --target=${{ matrix.target }} --features="${{ matrix.features }}"
