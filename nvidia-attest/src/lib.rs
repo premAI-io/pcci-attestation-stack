@@ -21,8 +21,8 @@ use crate::{
 #[derive(Debug)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct DecodedClaims {
-    overall_claims: OverallClaims,
-    gpu_claims: HashMap<String, GpuClaims>,
+    pub overall_claims: OverallClaims,
+    pub gpu_claims: HashMap<String, GpuClaims>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -36,7 +36,7 @@ pub struct EATToken {
 impl EATToken {
     #[cfg_attr(target_family = "wasm", wasm_bindgen)]
     pub fn parse(from: &str) -> Result<Self, GpuAttestationError> {
-        let [overall, gpu]: [serde_json::Value; 2] = serde_json::from_str(from.as_ref())?;
+        let [overall, gpu]: [serde_json::Value; 2] = serde_json::from_str(from)?;
 
         let overall = match overall.as_array().map(|val| val.deref()) {
             Some([_, Value::String(overall)]) => overall.clone(),
@@ -68,7 +68,7 @@ impl EATToken {
             .ok_or(GpuAttestationError::Parse("missing kid from jwt header"))
             .and_then(|kid| keys.find(&kid).ok_or(GpuAttestationError::MissingKey))?;
 
-        let key = DecodingKey::from_jwk(&key)?;
+        let key = DecodingKey::from_jwk(key)?;
 
         // setup validation requirements (just expiration and algorithm for now)
         let mut validation = Validation::new(jwt_header.alg);

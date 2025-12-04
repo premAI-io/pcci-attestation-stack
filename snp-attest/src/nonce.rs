@@ -12,11 +12,17 @@ impl SevNonce {
     }
 
     pub fn to_hex(&self) -> String {
-        hex::encode_upper(&self.bytes)
+        hex::encode_upper(self.bytes)
     }
 
     pub fn get_bytes(&self) -> &[u8; 64] {
         &self.bytes
+    }
+}
+
+impl Default for SevNonce {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

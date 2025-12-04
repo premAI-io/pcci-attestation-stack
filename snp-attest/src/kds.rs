@@ -11,23 +11,23 @@ pub use async_kds::*;
 pub use sync_kds::*;
 
 fn get_base_url(product_name: String) -> String {
-    return format!(
+    format!(
         "{KDS_CERT_SITE}{KDS_VCEK}/\
         {product_name}"
-    );
+    )
 }
 
 fn encode_hw_id(chip_id: &[u8; 64]) -> String {
-    return hex::encode(chip_id);
+    hex::encode(chip_id)
 }
 
 pub fn decode_stepping(
     stepping: std::string::String,
 ) -> std::option::Option<(std::string::String, std::string::String)> {
-    match stepping.chars().nth(0) {
-        Some(rev) => Some((rev.to_string(), stepping[1..].to_string())),
-        None => None,
-    }
+    stepping
+        .chars()
+        .next()
+        .map(|rev| (rev.to_string(), stepping[1..].to_string()))
 }
 
 pub fn decode_product_name(
@@ -46,7 +46,7 @@ pub fn decode_product_name(
         .collect::<Vec<std::string::String>>();
 
     match decoded.len() {
-        1 => Ok((decoded.get(0).unwrap().to_string(), None)),
+        1 => Ok((decoded.first().unwrap().to_string(), None)),
         _ => {
             let [name, stepping]: [std::string::String; 2] = decoded.try_into().unwrap();
             Ok((name, Some(stepping)))
@@ -55,7 +55,7 @@ pub fn decode_product_name(
 }
 
 pub fn get_query_tuple(name: &str, byte: u8) -> (std::string::String, std::string::String) {
-    return (String::from(name), format!("{:02}", byte));
+    (String::from(name), format!("{:02}", byte))
 }
 
 #[cfg(feature = "kds_sync")]
@@ -188,7 +188,7 @@ mod async_kds {
         tcb: TcbVersion,
         product_name: &str,
     ) -> anyhow::Result<sev::certs::snp::Chain> {
-        let vcek = get_vcek_tcb(&chip_id, tcb, product_name).await?;
+        let vcek = get_vcek_tcb(chip_id, tcb, product_name).await?;
         let cert_chain = get_cert_chain(product_name).await?;
         Ok(sev::certs::snp::Chain {
             ca: cert_chain,
@@ -216,8 +216,7 @@ pub mod crl {
         let ask_serial = &ask.serial;
 
         crl.iter_revoked_certificates()
-            .find(|a| a.serial() == ask_serial)
-            .is_some()
+            .any(|a| a.serial() == ask_serial)
     }
 
     pub fn verify(ark: &X509Certificate, crl: &CertificateRevocationList) -> anyhow::Result<bool> {

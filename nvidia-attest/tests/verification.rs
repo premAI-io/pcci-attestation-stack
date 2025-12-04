@@ -1,6 +1,6 @@
-use nvidia_attest::{EATToken, keychain::KeyChain};
+use nvidia_attest::keychain::KeyChain;
 
-const EAT_EXAMPLE: &'static str = include_str!("./eat_example.json");
+// const EAT_EXAMPLE: &'static str = include_str!("./eat_example.json");
 
 #[tokio::test]
 async fn get_chain() {
