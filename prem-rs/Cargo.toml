@@ -1,0 +1,11 @@
+[package]
+name = "prem-rs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+nvidia-attest = { path = "../nvidia-attest" }
+snp-attest = { path = "../snp-attest", features = ["kds_async"] }
