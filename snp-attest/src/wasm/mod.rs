@@ -4,7 +4,6 @@ pub mod chain;
 pub mod error;
 /// Methods for interacting with AMD's keyserver
 pub mod kds;
-///
 pub mod nonce;
 
 use std::ops::Deref;
@@ -24,6 +23,7 @@ use self::{
 #[wasm_bindgen]
 /// Represents a parsed attestation report with some already
 /// parsed commonly accessed fields
+#[allow(unused)]
 pub struct ParsedAttestation {
     cpu_fam_id: u8,
     cpu_mod_id: u8,
@@ -75,7 +75,7 @@ impl ParsedAttestation {
 
         /* Compare HWID */
         if let Some(hwid) = exts_map.get(&oid::HWID) {
-            oid::compare_bytes(hwid, &self.report.chip_id.to_vec())
+            oid::compare_bytes(hwid, self.report.chip_id.as_ref())
                 .then_some(())
                 .ok_or(VerificationReason::ChipId)?;
         }

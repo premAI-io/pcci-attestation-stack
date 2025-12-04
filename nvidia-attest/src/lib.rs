@@ -20,9 +20,10 @@ use crate::{
 
 #[derive(Debug)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[allow(unused)]
 pub struct DecodedClaims {
-    pub overall_claims: OverallClaims,
-    pub gpu_claims: HashMap<String, GpuClaims>,
+    overall_claims: OverallClaims,
+    gpu_claims: HashMap<String, GpuClaims>,
 }
 
 #[derive(PartialEq, Debug)]
