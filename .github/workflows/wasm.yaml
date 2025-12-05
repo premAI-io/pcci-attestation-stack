@@ -48,12 +48,10 @@ jobs:
                   registry-url: "https://npm.pkg.github.com"
             - name: Run wasm-pack build
               run: wasm-pack build prem-rs
-            - name: Configure .npmrc for GitHub Packages
+            - name: Add registry to package.json
               run: |
-                  echo "@${{ github.repository_owner }}:registry=https://npm.pkg.github.com" >> ~/.npmrc
-                  echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+                  jq '. |= . + {"repository": {"type": "git", "url": "https://github.com/premAI-io/pcci-attestation-stack"}}' prem-rs/pkg/package.json
+            - name: Publish npm package on the local github registry
+              run: npm publish prem-rs/pkg/
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            - name: Publish npm package on the local github registry
-              run: |
-                  npm publish prem-rs/pkg/
