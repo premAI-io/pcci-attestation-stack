@@ -18,6 +18,8 @@ pub enum GpuAttestationError {
     Jwt(#[from] jsonwebtoken::errors::Error),
     #[error("the key used to encode this jwt is not in the keychain")]
     MissingKey,
+    #[error("mismatching nonce")]
+    Nonce,
 }
 
 #[cfg(target_family = "wasm")]

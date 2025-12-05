@@ -1,11 +1,12 @@
-pub mod attestation;
 pub mod error;
 pub mod keychain;
 pub mod types;
+pub mod verifiers;
 
 use std::{collections::HashMap, ops::Deref};
 
 use jsonwebtoken::{DecodingKey, Validation};
+use libattest::{AddRule, VerificationBuilder};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -24,6 +25,18 @@ use crate::{
 pub struct DecodedClaims {
     overall_claims: OverallClaims,
     gpu_claims: HashMap<String, GpuClaims>,
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl DecodedClaims {
+    #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+    pub fn verify(&self, nonce: &str) -> Result<(), GpuAttestationError> {
+        use verifiers::*;
+
+        VerificationBuilder::new()
+            .add_rule(NonceVerifier::new(nonce))
+            .verify_all(self.gpu_claims.values())
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -60,7 +73,7 @@ impl EATToken {
     }
 
     #[cfg_attr(target_family = "wasm", wasm_bindgen)]
-    pub fn verify(self, keys: &KeyChain) -> Result<DecodedClaims, GpuAttestationError> {
+    pub fn attest(self, keys: &KeyChain) -> Result<DecodedClaims, GpuAttestationError> {
         // decoding the header beforehand is necessary to gain the kid
         let jwt_header = jsonwebtoken::decode_header(&self.overall)?;
 

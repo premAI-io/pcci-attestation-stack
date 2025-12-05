@@ -6,7 +6,7 @@ pub trait VerificationRule<Claims> {
 
     /// Should return Ok when verification was succesfull, [`Self::Error`] if
     /// any problem occurred
-    fn attest(&self, claims: &Claims) -> Result<(), Self::Error>;
+    fn verify(&self, claims: &Claims) -> Result<(), Self::Error>;
 }
 
 pub trait AddRule<Claims, R: VerificationRule<Claims>> {
@@ -27,9 +27,9 @@ where
     New::Error: From<Chain::Error>,
 {
     type Error = New::Error;
-    fn attest(&self, claims: &Claims) -> Result<(), Self::Error> {
-        self.1.attest(claims)?;
-        self.0.attest(claims)
+    fn verify(&self, claims: &Claims) -> Result<(), Self::Error> {
+        self.1.verify(claims)?;
+        self.0.verify(claims)
     }
 }
 
@@ -67,7 +67,17 @@ pub struct VerificationChain<Claims, C: VerificationRule<Claims>> {
 impl<Claims, C: VerificationRule<Claims>> VerificationChain<Claims, C> {
     /// Verifies a set of `claims` against the specified rules
     pub fn verify(&self, claims: &Claims) -> Result<(), C::Error> {
-        self.rules.attest(claims)
+        self.rules.verify(claims)
+    }
+
+    pub fn verify_all<'a>(
+        &self,
+        mut claims: impl Iterator<Item = &'a Claims>,
+    ) -> Result<(), C::Error>
+    where
+        Claims: 'a,
+    {
+        claims.try_for_each(|claim| self.verify(claim))
     }
 }
 
@@ -87,7 +97,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::attestation::{AddRule, VerificationBuilder, VerificationRule};
+    use crate::{AddRule, VerificationBuilder, VerificationRule};
 
     #[derive(Debug, PartialEq)]
     struct RulesError;
@@ -96,7 +106,7 @@ mod test {
 
     impl VerificationRule<&'static str> for Uppercase {
         type Error = RulesError;
-        fn attest(&self, claims: &&'static str) -> Result<(), Self::Error> {
+        fn verify(&self, claims: &&'static str) -> Result<(), Self::Error> {
             claims
                 .chars()
                 .all(|c| c.is_uppercase())
