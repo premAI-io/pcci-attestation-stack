@@ -65,7 +65,7 @@ impl<'a> FromFormField<'a> for CpuNonce {
 async fn cpu_attestation(
     nonce: CpuNonce,
     firmware: &State<SharedFirmware>,
-) -> Result<Vec<u8>, ApiError> {
+) -> Result<String, ApiError> {
     use anyhow::Context;
 
     let mut firmware = firmware.lock().await;
@@ -73,8 +73,9 @@ async fn cpu_attestation(
         .get_report(None, Some(nonce.nonce()), None)
         .context("error sourcing the report")?;
 
-    drop(firmware); // release the lock
+    drop(report); // release the lock
 
+    let base64 = BASE64_STANDARD.encode(report);
     Ok(report)
 }
 
