@@ -1,3 +1,4 @@
+use nvidia_attest::nonce::NvidiaNonce;
 use prem_rs::ClientBuilder;
 use snp_attest::{kds, nonce::SevNonce};
 
@@ -7,11 +8,18 @@ async fn main() {
         .build()
         .unwrap();
 
-    let nonce = SevNonce::new();
-    let attestation = client.request_sev(&nonce).await.unwrap();
-    let keychain = kds::fetch_certificates(&attestation).await.unwrap();
+    // let nonce = SevNonce::new();
+    // let attestation = client.request_sev(&nonce).await.unwrap();
+    // let keychain = kds::fetch_certificates(&attestation).await.unwrap();
 
-    attestation.verify(&keychain, &nonce).unwrap();
+    // attestation.verify(&keychain, &nonce).unwrap();
 
-    println!("success");
+    // println!("success");
+
+    let nonce = NvidiaNonce::new();
+    let attestation = client.request_nvidia(&nonce).await.unwrap();
+    let keychain = nvidia_attest::keychain::fetch_keychain().await.unwrap();
+
+    let parsed = attestation.verify(&keychain).unwrap();
+    parsed.validate(&nonce).unwrap();
 }

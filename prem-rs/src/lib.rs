@@ -93,7 +93,7 @@ impl Client {
     }
 
     pub async fn request_nvidia(&self, nonce: &NvidiaNonce) -> Result<EATToken, PremErr> {
-        let url = self.url.join("/attestation/cpu").unwrap();
+        let url = self.url.join("/attestation/nvidia").unwrap();
 
         let response = self
             .reqwest_client
