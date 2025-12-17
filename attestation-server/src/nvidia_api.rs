@@ -75,7 +75,9 @@ impl NvAttest {
     }
 
     pub fn attest(&self) -> AttestCommand {
-        let command = Command::new(&self.binary_path);
+        let mut command = Command::new(&self.binary_path);
+        command.arg("attest");
+
         AttestCommand { command }
     }
 }
