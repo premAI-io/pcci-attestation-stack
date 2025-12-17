@@ -1,133 +1,42 @@
-use std::{fmt::Debug, marker::PhantomData};
+pub mod verification;
+pub use verification::*;
 
-/// Defines a rule for which Claims should be verified
-pub trait VerificationRule<Claims> {
-    type Error: Debug;
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
 
-    /// Should return Ok when verification was succesfull, [`Self::Error`] if
-    /// any problem occurred
-    fn verify(&self, claims: &Claims) -> Result<(), Self::Error>;
-}
+// #[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
+// pub struct ByteNonce<const N: usize>(Box<[u8; N]>);
 
-pub trait AddRule<Claims, R: VerificationRule<Claims>> {
-    type Output<C: VerificationRule<Claims>>;
+// // #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+// impl<const N: usize> ByteNonce<N> {
+//     // #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
+//     pub fn new() -> Self {
+//         let mut bytes = Box::new([0u8; N]);
 
-    /// Adds an attestation rule to the set of rules
-    /// used to verify a given set of claims
-    fn add_rule(self, rule: R) -> Self::Output<R>;
-}
+//         getrandom::getrandom(bytes.as_mut_slice()).unwrap();
 
-// implementation for tuple chaining
-// so we can do something like (a, (b, (c, d)))
-// It's like a statically compiled fixed size array for eterogeneous types
-impl<Claims, Chain, New> VerificationRule<Claims> for (New, Chain)
-where
-    Chain: VerificationRule<Claims>,
-    New: VerificationRule<Claims>,
-    New::Error: From<Chain::Error>,
-{
-    type Error = New::Error;
-    fn verify(&self, claims: &Claims) -> Result<(), Self::Error> {
-        self.1.verify(claims)?;
-        self.0.verify(claims)
-    }
-}
+//         Self(bytes)
+//     }
 
-/// Builder for an attestation framework
-pub struct VerificationBuilder<Claims> {
-    _claims: PhantomData<Claims>,
-}
+//     pub fn generate() -> Self {
+//         Self::new()
+//     }
 
-impl VerificationBuilder<()> {
-    /// creates a new verification pipeline based on these claims
-    pub const fn new<C>() -> VerificationBuilder<C> {
-        VerificationBuilder {
-            _claims: PhantomData,
-        }
-    }
-}
+//     pub fn to_hex(&self) -> String {
+//         hex::encode_upper(self.0.as_ref())
+//     }
+// }
 
-impl<Claims, R: VerificationRule<Claims>> AddRule<Claims, R> for VerificationBuilder<Claims> {
-    type Output<O: VerificationRule<Claims>> = VerificationChain<Claims, O>;
-    fn add_rule(self, rule: R) -> Self::Output<R> {
-        VerificationChain {
-            _claims: self._claims,
-            rules: rule,
-        }
-    }
-}
+// impl<const N: usize> std::ops::Deref for ByteNonce<N> {
+//     type Target = [u8; N];
 
-/// This chain gest created when the first set of rules
-/// gets added to the [`AttestationBuilder`]
-pub struct VerificationChain<Claims, C: VerificationRule<Claims>> {
-    _claims: PhantomData<Claims>,
-    rules: C,
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
 
-impl<Claims, C: VerificationRule<Claims>> VerificationChain<Claims, C> {
-    /// Verifies a set of `claims` against the specified rules
-    pub fn verify(&self, claims: &Claims) -> Result<(), C::Error> {
-        self.rules.verify(claims)
-    }
-
-    pub fn verify_all<'a>(
-        &self,
-        mut claims: impl Iterator<Item = &'a Claims>,
-    ) -> Result<(), C::Error>
-    where
-        Claims: 'a,
-    {
-        claims.try_for_each(|claim| self.verify(claim))
-    }
-}
-
-impl<Claims, C: VerificationRule<Claims>, R: VerificationRule<Claims>> AddRule<Claims, R>
-    for VerificationChain<Claims, C>
-where
-    <R as VerificationRule<Claims>>::Error: From<C::Error>,
-{
-    type Output<O: VerificationRule<Claims>> = VerificationChain<Claims, (R, C)>;
-    fn add_rule(self, rule: R) -> Self::Output<R> {
-        VerificationChain {
-            _claims: self._claims,
-            rules: (rule, self.rules),
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::{AddRule, VerificationBuilder, VerificationRule};
-
-    #[derive(Debug, PartialEq)]
-    struct RulesError;
-
-    struct Uppercase;
-
-    impl VerificationRule<&'static str> for Uppercase {
-        type Error = RulesError;
-        fn verify(&self, claims: &&'static str) -> Result<(), Self::Error> {
-            claims
-                .chars()
-                .all(|c| c.is_uppercase())
-                .then_some(())
-                .ok_or(RulesError)
-        }
-    }
-
-    #[test]
-    fn test_chain() {
-        VerificationBuilder::new::<&str>()
-            .add_rule(Uppercase)
-            .verify(&"TEST")
-            .unwrap();
-    }
-
-    #[test]
-    fn test_error() {
-        let chain = VerificationBuilder::new::<&str>().add_rule(Uppercase);
-        let result = chain.verify(&"test");
-
-        assert_eq!(result, Err(RulesError));
-    }
-}
+// impl<const N: usize> From<Box<[u8; N]>> for ByteNonce<N> {
+//     fn from(value: Box<[u8; N]>) -> Self {
+//         Self(value)
+//     }
+// }

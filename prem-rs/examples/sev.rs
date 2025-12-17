@@ -8,7 +8,7 @@ async fn main() {
         .unwrap();
 
     let nonce = SevNonce::new();
-    let attestation = client.request_attestation(&nonce).await.unwrap();
+    let attestation = client.request_sev(&nonce).await.unwrap();
     let keychain = kds::fetch_certificates(&attestation).await.unwrap();
 
     attestation.verify(&keychain, &nonce).unwrap();

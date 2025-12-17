@@ -1,7 +1,12 @@
+use std::ops::Deref;
+
 use libattest::VerificationRule;
 use thiserror::Error;
 
-use crate::types::{GpuClaims, OverallClaims};
+use crate::{
+    nonce::NvidiaNonce,
+    types::{GpuClaims, OverallClaims},
+};
 
 #[derive(Debug, Error)]
 pub enum VerificationError {
@@ -16,7 +21,9 @@ pub enum VerificationError {
 }
 
 impl VerificationError {
-    fn invalid_nonce(got: impl Into<String>, expected: impl Into<String>) -> VerificationError {
+    fn invalid_nonce(got: impl AsRef<[u8]>, expected: impl AsRef<[u8]>) -> VerificationError {
+        let got = hex::encode(got);
+        let expected = hex::encode(expected);
         VerificationError::InvalidNonce(got.into(), expected.into())
     }
 }
@@ -67,44 +74,40 @@ impl VerificationRule<OverallClaims> for CheckValidator {
     }
 }
 
-pub struct NonceValidator<T: AsRef<str>>(T);
+pub struct NonceValidator<'a>(&'a NvidiaNonce);
 
-impl<T: AsRef<str>> From<T> for NonceValidator<T> {
-    fn from(value: T) -> Self {
-        Self(value)
+impl<'a> From<&'a NvidiaNonce> for NonceValidator<'a> {
+    fn from(value: &'a NvidiaNonce) -> Self {
+        NonceValidator(value)
     }
 }
 
 // implementing nonce validator for gpu claims
-impl<T: AsRef<str>> VerificationRule<GpuClaims> for NonceValidator<T> {
+impl VerificationRule<GpuClaims> for NonceValidator<'_> {
     type Error = VerificationError;
     fn verify(&self, claims: &GpuClaims) -> Result<(), Self::Error> {
-        let nonce = claims
-            .eat_nonce
-            .as_ref()
-            .ok_or(VerificationError::MissingData("eat_nonce"))?;
+        let expected = self.0.deref();
 
-        let expected_nonce = self.0.as_ref();
-
-        (nonce == expected_nonce)
+        (&claims.eat_nonce == expected)
             .then_some(())
-            .ok_or(VerificationError::invalid_nonce(nonce, expected_nonce))
+            .ok_or(VerificationError::invalid_nonce(
+                &claims.eat_nonce,
+                expected,
+            ))
     }
 }
 
 // implementing nonce validator for overall claims
-impl<T: AsRef<str>> VerificationRule<OverallClaims> for NonceValidator<T> {
+impl VerificationRule<OverallClaims> for NonceValidator<'_> {
     type Error = VerificationError;
     fn verify(&self, claims: &OverallClaims) -> Result<(), Self::Error> {
-        let nonce = claims
-            .eat_nonce
-            .as_ref()
-            .ok_or(VerificationError::MissingData("eat_nonce"))?;
+        let expected = self.0.deref();
 
-        let expected_nonce = self.0.as_ref();
-
-        (nonce == expected_nonce)
+        (&claims.eat_nonce == expected)
             .then_some(())
-            .ok_or(VerificationError::invalid_nonce(nonce, expected_nonce))
+            .ok_or(VerificationError::invalid_nonce(
+                &claims.eat_nonce,
+                expected,
+            ))
     }
 }

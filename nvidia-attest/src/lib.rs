@@ -1,5 +1,6 @@
 pub mod error;
 pub mod keychain;
+pub mod nonce;
 pub mod types;
 pub mod verifiers;
 
@@ -16,6 +17,7 @@ use wasm_bindgen::prelude::*;
 use crate::{
     error::GpuAttestationError,
     keychain::KeyChain,
+    nonce::NvidiaNonce,
     types::{GpuClaims, OverallClaims},
     verifiers::{CheckValidator, NonceValidator},
 };
@@ -27,9 +29,9 @@ pub struct DecodedClaims {
     gpu_claims: HashMap<String, GpuClaims>,
 }
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl DecodedClaims {
-    pub fn validate(&self, nonce: &str) -> Result<(), GpuAttestationError> {
+    pub fn validate(&self, nonce: &NvidiaNonce) -> Result<(), GpuAttestationError> {
         // validate gpu claims
         let gpu_validator = VerificationBuilder::new()
             .add_rule(CheckValidator)
@@ -55,7 +57,7 @@ pub struct EATToken {
     gpu: HashMap<String, String>,
 }
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl EATToken {
     pub fn parse(from: &str) -> Result<Self, GpuAttestationError> {
         let [overall, gpu]: [serde_json::Value; 2] = serde_json::from_str(from.as_ref())?;

@@ -68,15 +68,10 @@ impl TryFrom<DigestRepr> for Digest {
 /// Claims from the overall JWT token.
 #[derive(Debug, Deserialize)]
 pub struct OverallClaims {
-    // pub iss: Option<String>,
-    // pub iat: Option<i64>,
-    // pub exp: Option<i64>,
-    // pub nbf: Option<i64>,
-    // pub jti: Option<String>,
     #[serde(rename = "x-nvidia-ver")]
     pub claims_version: Option<String>,
-    #[serde(rename = "eat_nonce")]
-    pub eat_nonce: Option<String>,
+    #[serde(rename = "eat_nonce", deserialize_with = "hex::serde::deserialize")]
+    pub eat_nonce: [u8; 32],
     #[serde(rename = "x-nvidia-overall-att-result")]
     pub overall_att_result: Option<bool>,
 
@@ -115,7 +110,8 @@ pub struct GpuClaims {
     pub vbios_rim_cert_validated: Option<bool>,
     #[serde(rename = "x-nvidia-gpu-vbios-rim-signature-verified")]
     pub vbios_rim_signature_verified: Option<bool>,
-    pub eat_nonce: Option<String>,
+    #[serde(rename = "eat_nonce", deserialize_with = "hex::serde::deserialize")]
+    pub eat_nonce: [u8; 32],
     #[serde(rename = "hwmodel")]
     pub hw_model: Option<String>,
     #[serde(rename = "ueid")]

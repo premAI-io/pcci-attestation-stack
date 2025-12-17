@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use nvidia_attest::{EATToken, nonce::NvidiaNonce};
 use snp_attest::{ParsedAttestation, nonce::SevNonce};
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
@@ -16,6 +17,8 @@ pub enum PremErr {
     Request(#[from] reqwest::Error),
     #[error("error from sev attestation: ${0}")]
     Sev(#[from] snp_attest::error::AttestationError),
+    #[error("error from nvidia attestation: ${0}")]
+    Nvidia(#[from] nvidia_attest::error::GpuAttestationError),
 }
 
 impl From<PremErr> for JsValue {
@@ -69,10 +72,7 @@ pub struct Client {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Client {
-    pub async fn request_attestation(
-        &self,
-        nonce: &SevNonce,
-    ) -> Result<ParsedAttestation, PremErr> {
+    pub async fn request_sev(&self, nonce: &SevNonce) -> Result<ParsedAttestation, PremErr> {
         let url = self.url.join("/attestation/cpu").unwrap();
 
         // build the request with parameter ?nonce=<nonce> encoded in hex
@@ -90,5 +90,21 @@ impl Client {
         let attestation = ParsedAttestation::new(&attestation)?;
 
         Ok(attestation)
+    }
+
+    pub async fn request_nvidia(&self, nonce: &NvidiaNonce) -> Result<EATToken, PremErr> {
+        let url = self.url.join("/attestation/cpu").unwrap();
+
+        let response = self
+            .reqwest_client
+            .get(url)
+            .query(&[("nonce", nonce.to_hex())])
+            .send()
+            .await?;
+
+        let response = response.text().await?;
+        let response = EATToken::parse(&response)?;
+
+        Ok(response)
     }
 }
