@@ -13,10 +13,10 @@ jobs:
                       features: snp-attest/kds_async
                     - package: snp-attest
                       target: x86_64-unknown-linux-gnu
-                      feature: snp-attest/kds_async
+                      features: snp-attest/kds_async
                     - package: snp-attest
                       target: x86_64-unknown-linux-gnu
-                      feature: snp-attest/kds_sync
+                      features: snp-attest/kds_sync
                     - include: attestation-server
                       target: x86_64-unknown-linux-gnu
         runs-on: ubuntu-latest
