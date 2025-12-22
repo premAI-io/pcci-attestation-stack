@@ -59,6 +59,6 @@ jobs:
             - name: Run wasm-pack build
               run: wasm-pack build --scope ${{ github.repository_owner }} prem-rs
             - name: Publish the npm package
-              run: npm publish prem-rs/pkg/
+              run: npm publish --registry=https://npm.pkg.github.com prem-rs/pkg/
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
