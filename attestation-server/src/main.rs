@@ -6,6 +6,7 @@ mod nvidia_api;
 #[cfg(feature = "sev")]
 mod sev_api;
 
+use log::LevelFilter;
 use rocket::routes;
 use tokio::sync::Mutex;
 
@@ -13,6 +14,11 @@ use anyhow::Context;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    env_logger::builder()
+        .filter_level(LevelFilter::Info)
+        .parse_default_env()
+        .init();
+
     let rocket = rocket::build();
 
     #[cfg(feature = "sev")]
@@ -40,6 +46,9 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     rocket.launch().await?;
+
+    #[cfg(feature = "nvidia")]
+    nvat::SdkHandle::get_handle()?.shutdown();
 
     // // graceful shutdown
     Ok(())
