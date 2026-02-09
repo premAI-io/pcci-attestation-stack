@@ -1,16 +1,20 @@
 mod response;
 
+#[cfg(all(feature = "sev", feature = "tdx"))]
+compile_error!("Cannot have sev and tdx verifications at the same time");
+
 mod nonce;
 #[cfg(feature = "nvidia")]
 mod nvidia_api;
 #[cfg(feature = "sev")]
 mod sev_api;
+#[cfg(feature = "tdx")]
+mod tdx_api;
 
 use log::LevelFilter;
 use rocket::routes;
-use tokio::sync::Mutex;
 
-use anyhow::Context;
+use anyhow::Context as _;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -24,6 +28,7 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "sev")]
     let rocket = {
         use sev::firmware::guest::Firmware;
+        use tokio::sync::Mutex;
 
         let firmware: Mutex<Firmware> = Firmware::open()
             .context("failed to open sev-snp firmware")?
@@ -38,7 +43,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let rocket = {
         use nvat::SdkHandle;
 
-        let sdk = SdkHandle::get_handle()?;
+        let sdk = SdkHandle::get_handle().context("failed to get handle into nvat sdk")?;
 
         rocket
             .manage(sdk)

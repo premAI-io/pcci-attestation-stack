@@ -1,5 +1,3 @@
-use std::{fmt::Display, path::PathBuf};
-
 use anyhow::Context;
 use nvat::{AttestationBuilder, SdkHandle, nonce::NvatNonce};
 use rocket::State;

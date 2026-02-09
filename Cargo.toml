@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["libattest","nvidia-attest", "prem-rs", "snp-attest", "attestation-server"]
+members = ["libattest","nvidia-attest", "prem-rs", "snp-attest", "attestation-server", "tdx-attest"]
 
 [patch.crates-io]
 sev = { git = "https://github.com/BRA1L0R/sev" }
+
+[workspace.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
