@@ -2,34 +2,28 @@ use std::{borrow::Cow, error::Error, fmt::Display};
 
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
-pub trait Cursor {
-    fn take_slice<'a, const N: usize>(&mut self) -> Option<&'a [u8; N]>
-    where
-        Self: 'a;
+pub trait Cursor<'a> {
+    fn take_slice<const N: usize>(&mut self) -> Option<&'a [u8; N]>;
+    fn split_off(&mut self, n: usize) -> Option<&'a [u8]>;
 
-    fn split_off<'a>(&mut self, n: usize) -> Option<&'a [u8]>
-    where
-        Self: 'a;
+    fn sub_cursor(&mut self) -> impl Cursor<'a>;
 
     fn remaining(&self) -> usize;
 }
 
-impl Cursor for &[u8] {
+impl<'a> Cursor<'a> for &'a [u8] {
     fn remaining(&self) -> usize {
         self.len()
     }
 
-    fn take_slice<'a, const N: usize>(&mut self) -> Option<&'a [u8; N]>
-    where
-        Self: 'a,
-    {
+    fn take_slice<const N: usize>(&mut self) -> Option<&'a [u8; N]> {
         let (split, remaining) = self.split_first_chunk()?;
         *self = remaining;
 
         Some(split)
     }
 
-    fn split_off<'a>(&mut self, n: usize) -> Option<&'a [u8]>
+    fn split_off(&mut self, n: usize) -> Option<&'a [u8]>
     where
         Self: 'a,
     {
@@ -38,29 +32,30 @@ impl Cursor for &[u8] {
 
         Some(split)
     }
+
+    fn sub_cursor(&mut self) -> impl Cursor<'a> {
+        self
+    }
 }
 
-impl<C: Cursor> Cursor for &mut C {
-    fn take_slice<'a, const N: usize>(&mut self) -> Option<&'a [u8; N]>
-    where
-        Self: 'a,
-    {
-        (**self).take_slice()
-    }
-
-    fn split_off<'a>(&mut self, n: usize) -> Option<&'a [u8]>
-    where
-        Self: 'a,
-    {
-        (**self).split_off(n)
-    }
-
+impl<'a> Cursor<'a> for &mut &'a [u8] {
     fn remaining(&self) -> usize {
         (**self).remaining()
     }
+    fn take_slice<const N: usize>(&mut self) -> Option<&'a [u8; N]> {
+        Cursor::take_slice(*self)
+    }
+
+    fn split_off(&mut self, n: usize) -> Option<&'a [u8]> {
+        Cursor::split_off(*self, n)
+    }
+
+    fn sub_cursor(&mut self) -> impl Cursor<'a> {
+        &mut **self
+    }
 }
 
-pub trait CursorExt: Cursor {
+pub trait CursorExt<'a>: Cursor<'a> {
     fn take_u8(&mut self) -> Option<u8> {
         self.take_slice::<1>().map(|x| x[0])
     }
@@ -86,23 +81,24 @@ pub trait CursorExt: Cursor {
 
     fn zerocopy_ref<'b, T: FromBytes + Immutable + KnownLayout>(&mut self) -> Option<&'b T>
     where
-        Self: 'b,
+        'a: 'b,
     {
         let size = size_of::<T>();
         let source = self.split_off(size)?;
         Some(T::ref_from_bytes(source).unwrap())
     }
 
-    // fn parse<'d, T>(&mut self) -> Result<T, ParseError>
-    // where
-    //     T: Parse<'d> + Sized,
-    //     Self: Sized,
-    // {
-    //     T::parse(self)
-    // }
+    fn parse<'d, T>(&mut self) -> Result<T, ParseError>
+    where
+        T: Parse<'d> + Sized,
+        Self: Sized,
+        'a: 'd,
+    {
+        T::parse(self.sub_cursor())
+    }
 }
 
-impl<'a, T: Cursor> CursorExt for T {}
+impl<'a, T: Cursor<'a>> CursorExt<'a> for T {}
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -144,7 +140,9 @@ impl<T> ParseErrorExt<T> for Option<T> {
 }
 
 pub trait Parse<'d>: Sized + 'd {
-    fn parse(cursor: impl Cursor + 'd) -> Result<Self, ParseError>;
+    fn parse<'a>(cursor: impl Cursor<'a>) -> Result<Self, ParseError>
+    where
+        'a: 'd;
 }
 
 #[macro_export]
@@ -152,4 +150,24 @@ macro_rules! parse_bail {
     ($msg:expr) => {
         return Err($msg.into())
     };
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::{Cursor, CursorExt};
+    #[test]
+    fn test_sub() {
+        let mut a = &[1u8, 2, 3, 4][..];
+        let c = a.take_u8().unwrap();
+
+        let b = {
+            let mut b = a.sub_cursor();
+            b.take_u8().unwrap()
+        };
+
+        let d = a.take_u8().unwrap();
+
+        assert_eq!([c, b, d], [1, 2, 3]);
+    }
 }

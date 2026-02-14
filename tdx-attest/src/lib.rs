@@ -1,243 +1,136 @@
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
+#![allow(unused)]
+use p256::ecdsa::VerifyingKey;
+use p256::{EncodedPoint, elliptic_curve};
+use p256::{PublicKey, ecdsa::Signature};
 
-use crate::parser::{CursorExt, Parse, ParseError, ParseErrorExt};
+use crate::dcap::TdQuote;
+use crate::dcap::parser::Parse;
+use crate::error::Error;
 
-pub mod ca;
+use crate::{
+    certificates::CertificateChain,
+    dcap::types::{EnclaveReport, QuoteBody, QuoteHeader},
+};
+
+pub mod certificates;
+pub mod dcap;
+pub mod error;
 pub mod keychain;
-pub mod parser;
-
-pub const TEE_TYPE_TDX: u32 = 0x81;
-
-#[repr(transparent)]
-#[derive(FromBytes, KnownLayout, Clone, Copy, Immutable, Unaligned, Debug)]
-pub struct SVN([u8; 16]);
-
-#[repr(C, packed)]
-#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug)]
-struct QuoteHeader {
-    version: u16,
-    attestation_type: u16,
-    tee_type: u32,
-
-    reserved: [u8; 4],
-
-    qe_vendor_id: [u8; 16],
-    user_data: [u8; 20],
-}
-
-pub type Sha384 = [u8; 48];
-
-#[repr(C, packed)]
-#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug)]
-pub struct QuoteBody {
-    tee_tcb_svn: SVN,
-    mrseam: Sha384,
-    mrsignerseam: Sha384,
-    seamsttributes: [u8; 8],
-    tdattributes: [u8; 8],
-    xfam: [u8; 8],
-    mrtd: Sha384,
-    mrconfigid: [u8; 48],
-    mrowner: [u8; 48],
-    mrownerconfig: [u8; 48],
-    rtmr: [Sha384; 4],
-    report_data: [u8; 64],
-}
-
-#[repr(C, packed)]
-#[derive(FromBytes, Immutable, KnownLayout, Unaligned, Debug)]
-pub struct EnclaveReport {
-    cpu_svn: SVN,
-    miscselect: u32,
-    reserved: [u8; 28],
-    attributes: [u8; 16],
-    mrenclave: [u8; 32],
-    _1_reserved: [u8; 32],
-    mrsigner: [u8; 32],
-    _2_reserved: [u8; 96],
-    isv_prod_id: u16,
-    isv_svn: u16,
-    _3_reserved: [u8; 60],
-    report_data: [u8; 64],
-}
+pub mod pcs;
 
 #[derive(Debug)]
-pub struct QeAuthenticationData<'a>(&'a [u8]);
-
-impl<'d> Parse<'d> for QeAuthenticationData<'d> {
-    fn parse(mut cursor: impl parser::Cursor + 'd) -> Result<Self, ParseError> {
-        let size: usize = cursor
-            .take_u16()
-            .context("could not read size of qe authentication data")?
-            .into();
-
-        cursor
-            .split_off(size)
-            .map(QeAuthenticationData)
-            .context("not enough bytes to read Authentication Data")
-    }
+pub struct QeReportCertificationData {
+    qe_report: EnclaveReport,
+    qe_report_signature: Signature,
+    authentication_data: Vec<u8>,
+    certification_data: CertificationData,
 }
 
-#[derive(Debug)]
-pub struct QeReportCertificationData<'a> {
-    qe_report: &'a EnclaveReport,
-    qe_report_signature: &'a [u8; 64],
-    qe_authentication_data: QeAuthenticationData<'a>,
-    certification_data: QuoteData<'a>,
-}
-
-impl<'d> Parse<'d> for QeReportCertificationData<'d> {
-    fn parse(mut cursor: impl parser::Cursor + 'd) -> Result<Self, ParseError> {
-        let qe_report = cursor
-            .zerocopy_ref::<EnclaveReport>()
-            .context("failed parsing Enclave Report")?;
-
-        // let qe_report_signature = cursor
-        //     .take_slice()
-        //     .context("could not get QE Report Signature")?;
-
-        // let qe_authentication_das
-
-        todo!()
-        // Ok(Self {
-        //     qe_report,
-        //     qe_report_signature,
-        //     qe_authentication_data,
-        //     certification_data,
-        // })
-    }
-}
-
-#[derive(Debug)]
-pub enum QuoteData<'a> {
-    CpuSvns(&'a [u8]),
-    EncryptedCpuSvnsRSA2048(&'a [u8]),
-    EncryptedCpuSvnsRSA3072(&'a [u8]),
-    // PckLeaf, currently not supported
-    PckChain(&'a [u8]),
-    QeReportCertificationData(Box<QeReportCertificationData<'a>>),
-    // PlatformManifest, currently not supported
-}
-
-impl QuoteData<'_> {
-    const CPUSVNS: u16 = 0x01;
-    const RSA2048: u16 = 0x02;
-    const RSA3072: u16 = 0x03;
-    const PCKCHAIN: u16 = 0x05;
-    const QE_RCD: u16 = 0x06; // qe report certification data
-}
-
-impl<'d> Parse<'d> for QuoteData<'d> {
-    fn parse(mut cursor: impl parser::Cursor + 'd) -> Result<Self, ParseError> {
-        let certification_type = cursor
-            .take_u16()
-            .context("could not read certification type")?;
-
-        let data_size = cursor
-            .take_u32()
-            .context("could not read cetification data size")?
-            .try_into()
-            .expect("integer did not fit in u32");
-
-        let certification_data = cursor.split_off(data_size).context(format!(
-            "not enough bytes {data_size} to parse certification_type = {certification_type}"
-        ))?;
-
-        // try to match all different qe certification data types
-        let parsed = match certification_type {
-            Self::CPUSVNS => Self::CpuSvns(certification_data),
-            Self::RSA2048 => Self::EncryptedCpuSvnsRSA2048(certification_data),
-            Self::RSA3072 => Self::EncryptedCpuSvnsRSA3072(certification_data),
-            Self::PCKCHAIN => Self::PckChain(certification_data),
-            Self::QE_RCD => {
-                Self::QeReportCertificationData(QeReportCertificationData::parse(cursor)?.into())
-            }
-            _ => parse_bail!("unknown certification type in certification data"),
-        };
-
-        Ok(parsed)
-    }
-}
-
-#[derive(Debug)]
-pub struct Certification<'a> {
-    /// ecdsa signature over the header and td quote body using the private part of attestation_key
-    quote_signature: &'a [u8; 64],
-    /// the public part of the attestation key generated by the quoting enclave
-    attestation_key: &'a [u8; 64],
-    /// data required to verify the signature over QE report and the attestation key
-    quote_data: QuoteData<'a>,
-}
-
-impl<'d> Parse<'d> for Certification<'d> {
-    fn parse(mut cursor: impl parser::Cursor + 'd) -> Result<Self, ParseError> {
-        let quote_signature = cursor
-            .take_slice()
-            .context("could not read quote signature")?;
-
-        let attestation_key = cursor
-            .take_slice()
-            .context("could not read attestation key")?;
-
-        let quote_data_length: usize = cursor
-            .take_u32()
-            .context("could not get Quote Data length")?
-            as usize;
-
-        if quote_data_length > cursor.remaining() {
-            parse_bail!("not enough data remaining")
-        }
-
-        let certification_data = QuoteData::parse(cursor)?;
+impl TryFrom<dcap::QeReportCertificationData<'_>> for QeReportCertificationData {
+    type Error = Error;
+    fn try_from(value: dcap::QeReportCertificationData<'_>) -> Result<Self, Self::Error> {
+        let qe_report = value.qe_report.clone();
+        let certification_data = value.certification_data.try_into()?;
+        let qe_report_signature = Signature::from_bytes(value.qe_report_signature.into())?;
+        let authentication_data = value.qe_authentication_data.inner().to_vec();
 
         Ok(Self {
-            quote_signature,
-            attestation_key,
-            quote_data: certification_data,
+            qe_report,
+            qe_report_signature,
+            authentication_data,
+            certification_data,
         })
     }
 }
 
 #[derive(Debug)]
-pub struct Quote<'a> {
-    quote_header: &'a QuoteHeader,
-    quote_body: &'a QuoteBody,
-    certification: Certification<'a>,
+pub enum CertificationData {
+    PlainText(Vec<u8>),
+    EncryptedCpuSvnsRSA2048(Vec<u8>),
+    EncryptedCpuSvnsRSA3072(Vec<u8>),
+    PckChain(CertificateChain),
+    QeReportCertificationData(Box<QeReportCertificationData>),
 }
 
-impl<'d> Parse<'d> for Quote<'d> {
-    fn parse(mut cursor: impl parser::Cursor + 'd) -> Result<Self, ParseError> {
-        let quote_header: &QuoteHeader = cursor
-            .zerocopy_ref()
-            .context("failed to parse quote_header")?;
+impl TryFrom<dcap::QeCertificationData<'_>> for CertificationData {
+    type Error = Error;
+    fn try_from(value: dcap::QeCertificationData<'_>) -> Result<Self, Self::Error> {
+        use dcap::QeCertificationData::*;
 
-        // make some assumptions for attestation
-        // - quote version == 4 (v3 is for SGX, v5 isn't out yet)
-        // - tee_type is TDX
-        // - attestation type is 2 (only one supported by tdx as per documentation)
-        if quote_header.version != 4 {
-            parse_bail!("Only v4 quotes are supported");
-        }
+        let certification_data = match value {
+            PlainText(x) => Self::PlainText(x.to_owned()),
+            EncryptedCpuSvnsRSA2048(x) => Self::EncryptedCpuSvnsRSA2048(x.to_owned()),
+            EncryptedCpuSvnsRSA3072(x) => Self::EncryptedCpuSvnsRSA3072(x.to_owned()),
+            PckChain(chain) => Self::PckChain(CertificateChain::parse_pem_chain(chain)?),
+            QeReportCertificationData(report) => {
+                Self::QeReportCertificationData(Box::new((*report).try_into()?))
+            }
+        };
 
-        if quote_header.tee_type != TEE_TYPE_TDX {
-            parse_bail!("Only TDX is supported, not SGX");
-        }
+        Ok(certification_data)
+    }
+}
 
-        if quote_header.attestation_type != 2 {
-            parse_bail!("Attestation types other than 2 are not supported in TDX or SGX");
-        }
+#[derive(Debug)]
+pub struct Certification {
+    attestation_signature: Signature,
+    attestation_key: VerifyingKey,
+    certification_data: CertificationData,
+}
 
-        let quote_body = cursor
-            .zerocopy_ref::<QuoteBody>()
-            .context("failed to parse quote_body")?;
+impl TryFrom<dcap::Certification<'_>> for Certification {
+    type Error = Error;
+    fn try_from(value: dcap::Certification<'_>) -> Result<Self, Self::Error> {
+        // let attestation_key = VerifyingKey::from_sec1_bytes(value.attestation_key)?;
+        let attestation_key = decode_public_key(value.attestation_key)?;
+        let attestation_signature = Signature::from_bytes(value.quote_signature.into())?;
+        let certification_data = value.quote_data.try_into()?;
 
-        // let certification = cursor.parse::<Certification>()?;
-        let certification = Certification::parse(cursor)?;
-
-        Ok(Quote {
-            quote_header,
-            quote_body,
-            certification, // certification_data: todo!(),
+        Ok(Self {
+            attestation_signature,
+            attestation_key,
+            certification_data,
         })
     }
+}
+
+#[derive(Debug)]
+pub struct Quote {
+    header: QuoteHeader,
+    body: QuoteBody,
+    certification: Certification,
+}
+
+impl TryFrom<dcap::TdQuote<'_>> for Quote {
+    type Error = Error;
+    fn try_from(value: dcap::TdQuote<'_>) -> Result<Self, Self::Error> {
+        let header = value.quote_header.clone();
+        let body = value.quote_body.clone();
+        let certification = value.certification.try_into()?;
+
+        Ok(Self {
+            header,
+            body,
+            certification,
+        })
+    }
+}
+
+impl Quote {
+    pub fn from_bytes(quote: &[u8]) -> Result<Self, Error> {
+        let quote = TdQuote::parse(quote)?;
+        let quote = quote.try_into()?;
+
+        Ok(quote)
+    }
+}
+
+/// public keys are encoded in dcap without the header for sec1 (0x04)
+/// so we have to add it manually
+pub fn decode_public_key(public_key: &[u8; 64]) -> Result<VerifyingKey, p256::ecdsa::Error> {
+    let mut sec1 = [0u8; 65];
+    sec1[0] = 0x04;
+    sec1[1..].copy_from_slice(public_key);
+
+    VerifyingKey::from_sec1_bytes(&sec1)
 }

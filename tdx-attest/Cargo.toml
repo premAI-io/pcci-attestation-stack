@@ -5,8 +5,15 @@ edition = "2024"
 
 [dependencies]
 # dcap-qvl = "0.3"
-tdx-quote = "0.0.5"
+# tdx-quote = "0.0.5"
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 thiserror = "2"
 zerocopy = { version = "0.8.39", features = ["derive"] }
+p256 = "0.13.2"
+x509-cert = "0.2.5"
+spki = "0.7.3"
+der = "0.7.0"
+x509-verify = { version = "0.4.8", features = ["ed25519", "p256", "sha2", "x509"], default-features = false }
+signature = "2.2.0"
+sec1 = "0.7.3"

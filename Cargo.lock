@@ -1444,18 +1444,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "k256"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
-dependencies = [
- "cfg-if",
- "ecdsa",
- "elliptic-curve",
- "sha2",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1867,19 +1855,6 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe42f1670a52a47d448f14b6a5c61dd78fce51856e68edaa38f7ae3a46b8d6b6"
 dependencies = [
- "ecdsa",
- "elliptic-curve",
- "primeorder",
- "sha2",
-]
-
-[[package]]
-name = "p521"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fc9e2161f1f215afdfce23677034ae137bbd45016a880c2eb3ba8eb95f085b2"
-dependencies = [
- "base16ct",
  "ecdsa",
  "elliptic-curve",
  "primeorder",
@@ -2885,25 +2860,17 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 name = "tdx-attest"
 version = "0.1.0"
 dependencies = [
- "tdx-quote",
+ "der",
+ "p256",
+ "sec1",
+ "signature",
+ "spki",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "zerocopy",
-]
-
-[[package]]
-name = "tdx-quote"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a2b5801f4d44185197dffb3a63147bb227e19987b5b93628269625676ab1635"
-dependencies = [
- "nom",
- "p256",
- "pem",
- "sha2",
- "spki",
+ "x509-cert",
  "x509-verify",
+ "zerocopy",
 ]
 
 [[package]]
@@ -3798,10 +3765,7 @@ dependencies = [
  "der",
  "ecdsa",
  "ed25519-dalek",
- "k256",
  "p256",
- "p384",
- "p521",
  "sha2",
  "signature",
  "spki",
