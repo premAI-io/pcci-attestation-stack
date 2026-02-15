@@ -1,6 +1,7 @@
 pub mod ca;
+pub mod crl;
 
-use std::time::SystemTime;
+use std::{fmt::Display, time::SystemTime};
 
 use der::{
     Encode,
@@ -25,11 +26,29 @@ pub enum CertificateError {
     #[error("the format for the certificate chain is wrong")]
     BadChain,
 
+    #[error("error while verifying the signature of one or more certificates: {0}")]
+    BadSignature(p256::ecdsa::Error),
+
     #[error("the certificate is expired")]
     Expired,
 
     #[error("an error occurred while parsing the certificate: {0}")]
     Der(#[from] der::Error),
+}
+
+#[derive(Debug)]
+pub enum IntermediateCa {
+    Platform,
+    Processor,
+}
+
+impl IntermediateCa {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IntermediateCa::Platform => "platform",
+            IntermediateCa::Processor => "processor",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -42,12 +61,16 @@ pub struct EcdsaCert {
     signature: Signature,
 }
 
+pub type PinnedCertificate = &'static EcdsaCert;
+
 impl EcdsaCert {
     /// verifies that this certificate (`self`) contains a signed public key
     /// that attests for the authenticity of the signature of another certificate (`other`)
     pub fn verify_cert(&self, other: &Self) -> Result<(), CertificateError> {
         let other_tbs = other.certificate.tbs_certificate.to_der()?;
-        self.public_key.verify(&other_tbs, &other.signature);
+        self.public_key
+            .verify(&other_tbs, &other.signature)
+            .map_err(CertificateError::BadSignature)?;
 
         Ok(())
     }
@@ -133,34 +156,40 @@ impl TryFrom<x509_cert::Certificate> for EcdsaCert {
 /// represents a cryptographically verified
 /// certificate chain
 pub struct CertificateChain {
+    anchor: Option<PinnedCertificate>,
     chain: Vec<EcdsaCert>,
 }
 
 impl CertificateChain {
-    pub fn init_anchor(certificate: EcdsaCert) -> Result<Self, CertificateError> {
-        certificate.verify_self()?;
-
-        Ok(Self {
-            chain: vec![certificate],
-        })
+    pub fn with_anchor(anchor: PinnedCertificate) -> Self {
+        Self {
+            anchor: Some(anchor),
+            chain: vec![],
+        }
     }
 
-    pub fn leaf(&self) -> Option<&EcdsaCert> {
-        self.chain.last()
-    }
+    // pub fn leaf(&self) -> Option<&EcdsaCert> {
+    //     self.chain.last()
+    // }
+
+    // pub fn attest(&self, signature: &Signature) -> Result<(), CertificateError> {
+
+    // }
 
     pub fn push_certificate(&mut self, other: EcdsaCert) -> Result<(), CertificateError> {
-        let intermediate = self.chain.last().unwrap();
+        let verifier = self.chain.last().or(self.anchor);
 
-        // perform verification to check if the last certificate verifies the
-        // one we are trying to push into the certificate chain
-        intermediate.verify_cert(&other)?;
+        match verifier {
+            Some(verifier) => verifier.verify_cert(&other)?,
+            None => other.verify_self()?,
+        };
+
         self.chain.push(other);
 
         Ok(())
     }
 
-    pub fn parse_pem_chain(chain: &[u8]) -> Result<Self, CertificateError> {
+    pub fn parse_pem_chain(mut self, chain: &[u8]) -> Result<Self, CertificateError> {
         let chain = chain.strip_suffix(b"\0").unwrap_or(chain); // chain from tdx could be 0 terminated so we do a little sanitization
 
         let chain: Vec<EcdsaCert> = x509_cert::Certificate::load_pem_chain(chain)?
@@ -169,27 +198,30 @@ impl CertificateChain {
             .collect::<Result<_, _>>()?;
 
         let mut chain = chain.into_iter().rev();
-        let root = chain.next().ok_or(CertificateError::BadChain)?;
 
-        let mut verified_chain = Self::init_anchor(root)?;
-        chain.try_for_each(|cert| verified_chain.push_certificate(cert))?;
-
-        Ok(verified_chain)
-    }
-
-    /// verifies the current certificate chain with an out of bounds
-    /// certificate, by veryfying it signs our root of trust
-    pub fn verify_oob(&self, oob_root: &EcdsaCert) -> Result<(), CertificateError> {
-        let mut chain = self.chain.iter();
-        let chain_root = chain.next().unwrap();
-
-        oob_root.verify_cert(chain_root)?;
-        if let Some(certificate) = chain.next() {
-            // if there's an intermediate right after the root
-            // certificate optionally verify that as well
-            oob_root.verify_cert(certificate);
+        if let Some(anchor) = self.anchor {
+            // discard the root certificate from the pem chain if we already have our own embedded trust
+            let _root = chain.next().ok_or(CertificateError::BadChain)?;
         }
 
-        Ok(())
+        chain.try_for_each(|cert| self.push_certificate(cert))?;
+
+        Ok(self)
     }
+
+    // verifies the current certificate chain with an out of bounds
+    // certificate, by veryfying it signs our root of trust
+    // fn verify_oob(&self, oob_root: &EcdsaCert) -> Result<(), CertificateError> {
+    //     let mut chain = self.chain.iter();
+    //     let chain_root = chain.next().unwrap();
+
+    //     oob_root.verify_cert(chain_root)?;
+    //     if let Some(certificate) = chain.next() {
+    //         // if there's an intermediate right after the root
+    //         // certificate optionally verify that as well
+    //         oob_root.verify_cert(certificate);
+    //     }
+
+    //     Ok(())
+    // }
 }

@@ -24,8 +24,8 @@
   - get intel extension from certificate using the SGX OID EXTENSION
   - extract fmspc from intel extension (has its own FMPSC OID)
     - must be length 6
-  - also extracts ca from issuer for some reason
-- fetch collateral using fmspc, ca(??)
+  - also extracts ca=(platform/processor) from issuer for some reason
+- fetch collateral using fmspc, ca
   - fetch pck_crl and pck_crl issuer chain     <-- CERTIFICATE REVOCATION LIST
   - fetch tcb_info and tcb_info_issuer_chain
   - fetch qe_identity, qe_identity_issuer_chain

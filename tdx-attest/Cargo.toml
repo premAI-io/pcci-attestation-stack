@@ -17,3 +17,4 @@ der = "0.7.0"
 x509-verify = { version = "0.4.8", features = ["ed25519", "p256", "sha2", "x509"], default-features = false }
 signature = "2.2.0"
 sec1 = "0.7.3"
+reqwest = "0.13.2"

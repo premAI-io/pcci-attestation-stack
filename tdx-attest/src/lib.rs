@@ -3,6 +3,7 @@ use p256::ecdsa::VerifyingKey;
 use p256::{EncodedPoint, elliptic_curve};
 use p256::{PublicKey, ecdsa::Signature};
 
+use crate::certificates::ca;
 use crate::dcap::TdQuote;
 use crate::dcap::parser::Parse;
 use crate::error::Error;
@@ -61,7 +62,9 @@ impl TryFrom<dcap::QeCertificationData<'_>> for CertificationData {
             PlainText(x) => Self::PlainText(x.to_owned()),
             EncryptedCpuSvnsRSA2048(x) => Self::EncryptedCpuSvnsRSA2048(x.to_owned()),
             EncryptedCpuSvnsRSA3072(x) => Self::EncryptedCpuSvnsRSA3072(x.to_owned()),
-            PckChain(chain) => Self::PckChain(CertificateChain::parse_pem_chain(chain)?),
+            PckChain(chain) => {
+                Self::PckChain(CertificateChain::with_anchor(&ca::INTEL_CA).parse_pem_chain(chain)?)
+            }
             QeReportCertificationData(report) => {
                 Self::QeReportCertificationData(Box::new((*report).try_into()?))
             }

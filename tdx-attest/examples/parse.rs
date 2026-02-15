@@ -17,6 +17,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let chain = CertificateChain::parse_pem_chain(chain).unwrap();
     // // let chain = String::from_utf8_lossy(chain);
 
-    println!("{quote:?}");
+    // println!("{quote:?}");
     Ok(())
 }
