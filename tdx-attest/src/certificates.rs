@@ -13,7 +13,7 @@ use p256::{
 };
 use spki::{DecodePublicKey, ObjectIdentifier};
 use thiserror::Error;
-use x509_cert::{anchor::CertPolicies, crl::TbsCertList};
+use x509_cert::{anchor::CertPolicies, crl::TbsCertList, serial_number::SerialNumber};
 
 #[derive(Debug, Error)]
 pub enum CertificateError {
@@ -29,11 +29,14 @@ pub enum CertificateError {
     #[error("error while verifying the signature of one or more certificates: {0}")]
     BadSignature(p256::ecdsa::Error),
 
-    #[error("the certificate is expired")]
+    #[error("this cryptographic entity is expired")]
     Expired,
 
     #[error("an error occurred while parsing the certificate: {0}")]
     Der(#[from] der::Error),
+
+    #[error("a certificate (serial_number = {serial_number}) has been revoked")]
+    Revoked { serial_number: SerialNumber },
 }
 
 #[derive(Debug)]
@@ -67,7 +70,7 @@ impl EcdsaCert {
     /// verifies that this certificate (`self`) contains a signed public key
     /// that attests for the authenticity of the signature of another certificate (`other`)
     pub fn verify_cert(&self, other: &Self) -> Result<(), CertificateError> {
-        let other_tbs = other.certificate.tbs_certificate.to_der()?;
+        let other_tbs = other.certificate.tbs_certificate().to_der()?;
         self.public_key
             .verify(&other_tbs, &other.signature)
             .map_err(CertificateError::BadSignature)?;
@@ -87,20 +90,20 @@ impl EcdsaCert {
         // Check that the signature and public key are in the
         // format supported by the library (elliptic curve certificates)
         certificate
-            .signature_algorithm
+            .signature_algorithm()
             .assert_algorithm_oid(ECDSA_WITH_SHA_256)
             .map_err(CertificateError::WrongAlgorithm)?;
 
         certificate
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .algorithm
             .assert_algorithm_oid(ID_EC_PUBLIC_KEY)
             .map_err(CertificateError::WrongAlgorithm)?;
 
         // signature
         let signature = certificate
-            .signature
+            .signature()
             .as_bytes()
             .ok_or(CertificateError::WrongFormat)?;
 
@@ -109,8 +112,8 @@ impl EcdsaCert {
 
         // signed public key
         let public_key = certificate
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .subject_public_key
             .as_bytes()
             .ok_or(CertificateError::WrongFormat)?;
@@ -120,14 +123,14 @@ impl EcdsaCert {
 
         // check for certificate validity
         let not_after = certificate
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_after
             .to_system_time();
 
         let not_before = certificate
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_before
             .to_system_time();
 
@@ -142,6 +145,12 @@ impl EcdsaCert {
             signature,
             public_key,
         })
+    }
+}
+
+impl Verifier<Signature> for EcdsaCert {
+    fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), signature::Error> {
+        self.public_key.verify(msg, signature)
     }
 }
 
@@ -160,6 +169,13 @@ pub struct CertificateChain {
     chain: Vec<EcdsaCert>,
 }
 
+impl Verifier<Signature> for CertificateChain {
+    fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), signature::Error> {
+        let certificate = self.chain.last().or(self.anchor).unwrap();
+        certificate.verify(msg, signature)
+    }
+}
+
 impl CertificateChain {
     pub fn with_anchor(anchor: PinnedCertificate) -> Self {
         Self {
@@ -167,14 +183,6 @@ impl CertificateChain {
             chain: vec![],
         }
     }
-
-    // pub fn leaf(&self) -> Option<&EcdsaCert> {
-    //     self.chain.last()
-    // }
-
-    // pub fn attest(&self, signature: &Signature) -> Result<(), CertificateError> {
-
-    // }
 
     pub fn push_certificate(&mut self, other: EcdsaCert) -> Result<(), CertificateError> {
         let verifier = self.chain.last().or(self.anchor);

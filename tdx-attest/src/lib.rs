@@ -1,4 +1,6 @@
+#![warn(clippy::pedantic)]
 #![allow(unused)]
+
 use p256::ecdsa::VerifyingKey;
 use p256::{EncodedPoint, elliptic_curve};
 use p256::{PublicKey, ecdsa::Signature};

@@ -28,13 +28,14 @@ impl VerificationError {
     }
 }
 
+/// libattest validator that ensures ok booleans
+/// are set to true
 pub struct CheckValidator;
 
 impl VerificationRule<GpuClaims> for CheckValidator {
     type Error = VerificationError;
     fn verify(&self, claims: &GpuClaims) -> Result<(), Self::Error> {
         let checks = [
-            // ("arch_check", claims.arch_check), ??
             (
                 "attestation_report_cert_validated",
                 claims.attestation_report_cert_validated,
@@ -43,16 +44,6 @@ impl VerificationRule<GpuClaims> for CheckValidator {
                 "driver_rim_cert_validated",
                 claims.driver_rim_cert_validated,
             ),
-            // ("driver_rim_fetched", claims.driver_rim_fetched), ??
-            // (
-            //     "driver_rim_signature_verified",
-            //     claims.driver_rim_signature_verified,
-            // ),
-            // ("vbios_rim_cert_validated", claims.vbios_rim_cert_validated),
-            // (
-            //     "vbios_rim_signature_verified",
-            //     claims.vbios_rim_signature_verified,
-            // ),
         ];
         checks
             .into_iter()
@@ -74,6 +65,7 @@ impl VerificationRule<OverallClaims> for CheckValidator {
     }
 }
 
+// validates a given nonce
 pub struct NonceValidator<'a>(&'a NvidiaNonce);
 
 impl<'a> From<&'a NvidiaNonce> for NonceValidator<'a> {
