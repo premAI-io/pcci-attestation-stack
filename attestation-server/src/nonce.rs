@@ -17,7 +17,7 @@ impl<'a, const N: usize, T: From<Box<[u8; N]>> + Send + Sync> FromFormField<'a>
 
         let nonce: Box<[u8; N]> = decoded
             .try_into()
-            .map_err(|_| Error::validation("nonce is not exactly 32 bytes wide"))?;
+            .map_err(|_| Error::validation(format!("nonce is not exactly {} bytes wide", N)))?;
 
         Ok(NonceParam(nonce.into()))
     }

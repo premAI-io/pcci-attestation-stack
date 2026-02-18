@@ -1716,7 +1716,7 @@ dependencies = [
 [[package]]
 name = "nvat"
 version = "0.1.0"
-source = "git+ssh://git@github.com/premAI-io/nvat-rs.git?branch=main#da338b06fa4c84b2c1674d836a0489799e10cfda"
+source = "git+ssh://git@github.com/premAI-io/nvat-rs.git?branch=main#0b02aea69ba1e6f320a007ae13426d58409381b7"
 dependencies = [
  "log",
  "nvat_sys",
@@ -1726,7 +1726,7 @@ dependencies = [
 [[package]]
 name = "nvat_sys"
 version = "1.0.0"
-source = "git+ssh://git@github.com/premAI-io/nvat-rs.git?branch=main#da338b06fa4c84b2c1674d836a0489799e10cfda"
+source = "git+ssh://git@github.com/premAI-io/nvat-rs.git?branch=main#0b02aea69ba1e6f320a007ae13426d58409381b7"
 dependencies = [
  "bindgen",
  "pkg-config",

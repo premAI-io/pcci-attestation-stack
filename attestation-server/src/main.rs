@@ -20,6 +20,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     let rocket = rocket::build();
+    let mut routes = routes![];
 
     #[cfg(feature = "sev")]
     let rocket = {
@@ -29,9 +30,9 @@ async fn main() -> Result<(), anyhow::Error> {
             .context("failed to open sev-snp firmware")?
             .into();
 
+        routes.extend(routes![sev_api::cpu_attestation]);
         rocket
             .manage(firmware)
-            .mount("/attestation", routes![sev_api::cpu_attestation])
     };
 
     #[cfg(feature = "nvidia")]
@@ -39,13 +40,15 @@ async fn main() -> Result<(), anyhow::Error> {
         use nvat::SdkHandle;
 
         let sdk = SdkHandle::get_handle()?;
-
+        
+        routes.extend(routes![nvidia_api::nvidia_attestation]);
         rocket
             .manage(sdk)
-            .mount("/attestation", routes![nvidia_api::nvidia_attestation])
     };
 
-    rocket.launch().await?;
+    rocket
+        .mount("/attestation", routes)
+        .launch().await?;
 
     #[cfg(feature = "nvidia")]
     nvat::SdkHandle::get_handle()?.shutdown();

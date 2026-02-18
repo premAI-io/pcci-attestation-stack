@@ -6,9 +6,12 @@
          cmake --build build -j$(nproc)
          cmake --install build --strip
          sudo ldconfig
+
 - `bins`
    >
          cargo build --target x86_64-unknown-linux-gnu --release
+   
+   * need libnvat.so
 
 - `wasm`
    >
@@ -19,3 +22,4 @@
 ## TODOs
 
 - use `vcpkg` for cross compilation?
+- chroot with all deps ($SYSROOT)

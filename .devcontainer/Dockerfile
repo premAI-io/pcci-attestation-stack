@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/devcontainers/rust:2-bookworm
 ENV TARGET_TRIPLE=x86_64-linux-
 ENV RUST_TARGET=x86_64-unknown-linux-gnu
 ENV OPENSSL_TARGET=linux-generic64
-ENV OPENSSL_VER="3.0.17"
+ENV OPENSSL_VER=3.5.3
 ENV ZLIB_VER=1.3.2
 ENV CURL_VER=8.7.1
 ENV LIBTOOL_VER=2.4.7
@@ -22,12 +22,12 @@ RUN apt-get update \
     automake \
     autoconf-archive \
     cmake \
+    clang \
     libclang-dev \
-    libtool \
     pkgconf \
     acl \
-    libltdl-dev \
-    clang
+    libtool
+    # libltdl-dev \
 
 ENV SYSROOT="/x86_64-sysroot"
 ENV PKG_CONFIG_ALLOW_CROSS=1
@@ -70,6 +70,8 @@ RUN wget \
         --prefix=${SYSROOT} \
         --host=${TARGET_TRIPLE}gnu \
         --with-ssl=${SYSROOT} \
+        --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt \
+        --disable-ldap \
         --disable-shared \
         --enable-static \
     && make -j$(nproc) \
@@ -97,7 +99,7 @@ RUN \
         --host=${TARGET_TRIPLE}gnu \
         --enable-static --disable-shared \
         --with-lzma=no --with-zlib=no \
-    && make -j$(nproc) \
+    && PATH="${SYSROOT}/bin:$PATH" make -j$(nproc) \
     && make install \
     && rm -rf /tmp/libxml2
 
@@ -122,6 +124,7 @@ RUN \
     && ./configure \
         --prefix=${SYSROOT} --host=${TARGET_TRIPLE}gnu \
         --with-libltdl=${SYSROOT} --enable-static \
+        --enable-crypto-dl=no --with-default-crypto=openssl --with-openssl=${SYSROOT} \
     && make -j$(nproc) \
     && make install \
     && rm -rf \
@@ -147,6 +150,21 @@ RUN \
 
 RUN rustup target add \
         ${RUST_TARGET}
+
+RUN \
+    curl -fsSL https://download.docker.com/linux/debian/gpg \
+        -o /etc/apt/keyrings/docker.asc \
+    && chmod a+r /etc/apt/keyrings/docker.asc \
+    && tee /etc/apt/sources.list.d/docker.sources <<EOF \
+    && apt-get update \
+    && apt-get install -y \
+        docker-ce-cli
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
 
 RUN apt-get autoremove -y \
     && apt-get clean -y \
