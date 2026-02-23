@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use nvidia_attest::{EATToken, nonce::NvidiaNonce};
+use nvidia_attest::{EATToken, keychain::KeyChain, nonce::NvidiaNonce};
 use snp_attest::{ParsedAttestation, nonce::SevNonce};
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
@@ -104,5 +104,32 @@ impl Client {
         let response = EATToken::parse(&response)?;
 
         Ok(response)
+    }
+
+    /// Completes a full round of attestation. Generates nonce and validates claims all in one
+    pub async fn attest_sev(&self) -> Result<(), PremErr> {
+        let nonce = SevNonce::generate();
+
+        let attestation = self.request_sev(&nonce).await?;
+        let keychain = snp_attest::kds::fetch_certificates(&attestation).await?;
+
+        attestation.verify(&keychain, &nonce)?;
+
+        // TODO: measurement verification
+
+        Ok(())
+    }
+
+    /// Completes a full round of attestation. Generates nonce and validates claims all in one
+    pub async fn attest_nvidia(&self) -> Result<(), PremErr> {
+        let nonce = NvidiaNonce::generate();
+        let keychain = KeyChain::fetch_keychain().await?;
+
+        let attestation = self.request_nvidia(&nonce).await?;
+        let claims = attestation.verify(&keychain)?;
+
+        claims.validate(&nonce)?;
+
+        Ok(())
     }
 }
