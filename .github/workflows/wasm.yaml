@@ -245,7 +245,9 @@ jobs:
                     context: ./
                     file: ./attestation-server/Dockerfile
                     push: true
-                    tags: premai-io/attestation-server:latest
+                    tags: |
+                      ${{ env.IMAGE_NAME }}:latest
+                      ${{ env.IMAGE_NAME }}:${{ github.sha }}
                     build-args: |
                       SYSROOT=./sysroot
                       FEATURES=sev nvidia
