@@ -241,6 +241,8 @@ jobs:
                     password: ${{ secrets.REPOSITORY_PASSWORD }}
               - uses: docker/build-push-action@v6
                 name: Build and push
+                env:
+                  IMAGE_NAME: ${{ vars.REPOSITORY_URL }}/premai-io/attestation-server
                 with:
                     context: ./
                     file: ./attestation-server/Dockerfile

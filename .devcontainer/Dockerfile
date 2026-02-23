@@ -27,7 +27,7 @@ RUN apt-get update \
     pkgconf \
     acl \
     libtool
-    # libltdl-dev \
+# libltdl-dev \
 
 ENV SYSROOT="/x86_64-sysroot"
 ENV PKG_CONFIG_ALLOW_CROSS=1
@@ -41,8 +41,8 @@ RUN wget \
     && tar xvf /tmp/openssl-${OPENSSL_VER}.tar.gz \
     && cd openssl-${OPENSSL_VER} \
     && ./Configure ${OPENSSL_TARGET} \
-        --prefix=${SYSROOT} \
-        --cross-compile-prefix=${TARGET_TRIPLE}gnu- \
+    --prefix=${SYSROOT} \
+    --cross-compile-prefix=${TARGET_TRIPLE}gnu- \
     && make -j$(nproc) \
     && make install \
     && rm -rf \
@@ -67,20 +67,20 @@ RUN wget \
     && tar xvf curl-${CURL_VER}.tar.gz \
     && cd curl-${CURL_VER} \
     && CPPFLAGS="-I${SYSROOT}/include" LDFLAGS="-L${SYSROOT}/lib" ./configure \
-        --prefix=${SYSROOT} \
-        --host=${TARGET_TRIPLE}gnu \
-        --with-ssl=${SYSROOT} \
-        --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt \
-        --disable-ldap \
-        --disable-shared \
-        --enable-static \
+    --prefix=${SYSROOT} \
+    --host=${TARGET_TRIPLE}gnu \
+    --with-ssl=${SYSROOT} \
+    --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt \
+    --disable-ldap \
+    --disable-shared \
+    --enable-static \
     && make -j$(nproc) \
     && make install \
     && rm -rf /tmp/curl-${CURL_VER} /tmp/curl-${CURL_VER}.tar.gz
 
 RUN \
     wget https://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VER}.tar.gz \
-        -O /tmp/libtool-${LIBTOOL_VER}.tar.gz \
+    -O /tmp/libtool-${LIBTOOL_VER}.tar.gz \
     && cd /tmp \
     && tar xvf libtool-${LIBTOOL_VER}.tar.gz \
     && cd libtool-${LIBTOOL_VER} \
@@ -92,44 +92,44 @@ RUN \
 # nvat-rs build
 RUN \
     git clone https://gitlab.gnome.org/GNOME/libxml2.git \
-        -b v${LIBXML2_VER} /tmp/libxml2 \
+    -b v${LIBXML2_VER} /tmp/libxml2 \
     && cd /tmp/libxml2 \
     && CFLAGS=-fPIC ./autogen.sh \
-        --prefix=${SYSROOT} \
-        --host=${TARGET_TRIPLE}gnu \
-        --enable-static --disable-shared \
-        --with-lzma=no --with-zlib=no \
+    --prefix=${SYSROOT} \
+    --host=${TARGET_TRIPLE}gnu \
+    --enable-static --disable-shared \
+    --with-lzma=no --with-zlib=no \
     && PATH="${SYSROOT}/bin:$PATH" make -j$(nproc) \
     && make install \
     && rm -rf /tmp/libxml2
 
 RUN \
     git clone https://gitlab.gnome.org/GNOME/libxslt.git -b v${LIBXSLT_VER} \
-      /tmp/libxslt \
+    /tmp/libxslt \
     && cd /tmp/libxslt \
     && ./autogen.sh \
-        --prefix=${SYSROOT} --host=${TARGET_TRIPLE}gnu \
-        --with-python=no --enable-shared --enable-static \
+    --prefix=${SYSROOT} --host=${TARGET_TRIPLE}gnu \
+    --with-python=no --enable-shared --enable-static \
     && make -j$(nproc) \
     && make install \
     && rm -rf /tmp/libxslt
 
 RUN \
     wget \
-      https://github.com/lsh123/xmlsec/releases/download/${XMLSEC_VER}/xmlsec1-${XMLSEC_VER}.tar.gz \
-      -O/tmp/xmlsec1-${XMLSEC_VER}.tar.gz \
+    https://github.com/lsh123/xmlsec/releases/download/${XMLSEC_VER}/xmlsec1-${XMLSEC_VER}.tar.gz \
+    -O/tmp/xmlsec1-${XMLSEC_VER}.tar.gz \
     && cd /tmp \
     && tar xvf xmlsec1-${XMLSEC_VER}.tar.gz \
     && cd xmlsec1-${XMLSEC_VER} \
     && ./configure \
-        --prefix=${SYSROOT} --host=${TARGET_TRIPLE}gnu \
-        --with-libltdl=${SYSROOT} --enable-static \
-        --enable-crypto-dl=no --with-default-crypto=openssl --with-openssl=${SYSROOT} \
+    --prefix=${SYSROOT} --host=${TARGET_TRIPLE}gnu \
+    --with-libltdl=${SYSROOT} --enable-static \
+    --enable-crypto-dl=no --with-default-crypto=openssl --with-openssl=${SYSROOT} \
     && make -j$(nproc) \
     && make install \
     && rm -rf \
-        /tmp/xmlsec1-${XMLSEC_VER} \
-        /tmp/xmlsec1-${XMLSEC_VER}.tar.gz
+    /tmp/xmlsec1-${XMLSEC_VER} \
+    /tmp/xmlsec1-${XMLSEC_VER}.tar.gz
 
 # RUN git clone \
 #     https://github.com/tpm2-software/tpm2-tss.git \
@@ -149,16 +149,16 @@ RUN \
 #     && rm -rf /tmp/tpm2-tss
 
 RUN rustup target add \
-        ${RUST_TARGET}
+    ${RUST_TARGET}
 
 RUN \
     curl -fsSL https://download.docker.com/linux/debian/gpg \
-        -o /etc/apt/keyrings/docker.asc \
+    -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
     && tee /etc/apt/sources.list.d/docker.sources <<EOF \
     && apt-get update \
     && apt-get install -y \
-        docker-ce-cli
+    docker-ce-cli
 Types: deb
 URIs: https://download.docker.com/linux/debian
 Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
