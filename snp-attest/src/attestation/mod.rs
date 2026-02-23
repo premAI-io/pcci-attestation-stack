@@ -4,16 +4,16 @@ pub mod chain;
 pub mod error;
 /// Methods for interacting with AMD's keyserver
 pub mod kds;
-///
-pub mod nonce;
+// pub mod nonce;
 
 use std::ops::Deref;
 
-use crate::oid;
-use der::Encode;
-use nonce::Nonce;
-use sev::{Generation, firmware::guest::AttestationReport, parser::ByteParser};
+#[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
+
+use crate::{nonce::SevNonce, oid};
+use der::Encode;
+use sev::{Generation, firmware::guest::AttestationReport, parser::ByteParser};
 use x509_parser::prelude::*;
 
 use self::{
@@ -21,9 +21,10 @@ use self::{
     error::{AttestationError, ParseReason, VerificationReason},
 };
 
-#[wasm_bindgen]
+#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
 /// Represents a parsed attestation report with some already
 /// parsed commonly accessed fields
+#[allow(unused)]
 pub struct ParsedAttestation {
     cpu_fam_id: u8,
     cpu_mod_id: u8,
@@ -32,9 +33,8 @@ pub struct ParsedAttestation {
     report: AttestationReport,
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl ParsedAttestation {
-    #[wasm_bindgen(constructor)]
     /// Parses and constructs a new attestation report from a stream of binary data
     pub fn new(bytes: &[u8]) -> Result<Self, AttestationError> {
         let report =
@@ -58,9 +58,8 @@ impl ParsedAttestation {
         })
     }
 
-    #[wasm_bindgen]
     /// Verifies the attestation report against a certificate chain
-    pub fn verify(&self, chain: &VerifiedChain, nonce: &Nonce) -> Result<(), AttestationError> {
+    pub fn verify(&self, chain: &VerifiedChain, nonce: &SevNonce) -> Result<(), AttestationError> {
         // let certificates = chain.parse_certificates()?;
 
         // TODO: unify everything and use either x509-cert or x509-parser
@@ -75,18 +74,22 @@ impl ParsedAttestation {
 
         /* Compare HWID */
         if let Some(hwid) = exts_map.get(&oid::HWID) {
-            oid::compare_bytes(hwid, &self.report.chip_id.to_vec())
+            oid::compare_bytes(hwid, self.report.chip_id.as_ref())
                 .then_some(())
                 .ok_or(VerificationReason::ChipId)?;
         }
 
         let product_name_ext = exts_map.get(&oid::PRODUCT_NAME).unwrap();
-        let (product_name, _) = crate::kds::decode_product_name(product_name_ext.value.to_vec())
-            .map_err(|_| ParseReason::DecodeProductName)?;
+        let (product_name, _) =
+            crate::kds_util::decode_product_name(product_name_ext.value.to_vec())
+                .map_err(|_| ParseReason::DecodeProductName)?;
 
         if product_name != self.generation.titlecase() {
             Err(VerificationReason::BadProductName)?;
         }
+
+        /* check for revocation */
+        // TODO: check in certificate revocation list
 
         /* Check full chain */
         log::info!("Verifying self report signature");

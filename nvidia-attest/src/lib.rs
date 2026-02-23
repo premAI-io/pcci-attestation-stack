@@ -1,11 +1,13 @@
-pub mod attestation;
 pub mod error;
 pub mod keychain;
+pub mod nonce;
 pub mod types;
+pub mod verifiers;
 
 use std::{collections::HashMap, ops::Deref};
 
 use jsonwebtoken::{DecodingKey, Validation};
+use libattest::{AddRule, VerificationBuilder};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -15,18 +17,41 @@ use wasm_bindgen::prelude::*;
 use crate::{
     error::GpuAttestationError,
     keychain::KeyChain,
+    nonce::NvidiaNonce,
     types::{GpuClaims, OverallClaims},
+    verifiers::{CheckValidator, NonceValidator},
 };
 
 #[derive(Debug)]
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
 pub struct DecodedClaims {
     overall_claims: OverallClaims,
     gpu_claims: HashMap<String, GpuClaims>,
 }
 
-#[derive(PartialEq, Debug)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl DecodedClaims {
+    pub fn validate(&self, nonce: &NvidiaNonce) -> Result<(), GpuAttestationError> {
+        // validate gpu claims
+        let gpu_validator = VerificationBuilder::new()
+            .add_rule(CheckValidator)
+            .add_rule(NonceValidator::from(nonce));
+
+        gpu_validator.verify_all(self.gpu_claims.values())?;
+
+        // validate overall claims
+        let overall_validator = VerificationBuilder::new()
+            .add_rule(CheckValidator)
+            .add_rule(NonceValidator::from(nonce));
+
+        overall_validator.verify(&self.overall_claims)?;
+
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Debug)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
 pub struct EATToken {
     overall: String,
     gpu: HashMap<String, String>,
@@ -34,9 +59,8 @@ pub struct EATToken {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl EATToken {
-    #[cfg_attr(target_family = "wasm", wasm_bindgen)]
     pub fn parse(from: &str) -> Result<Self, GpuAttestationError> {
-        let [overall, gpu]: [serde_json::Value; 2] = serde_json::from_str(from.as_ref())?;
+        let [overall, gpu]: [serde_json::Value; 2] = serde_json::from_str(from)?;
 
         let overall = match overall.as_array().map(|val| val.deref()) {
             Some([_, Value::String(overall)]) => overall.clone(),
@@ -58,7 +82,6 @@ impl EATToken {
         Ok(Self { overall, gpu })
     }
 
-    #[cfg_attr(target_family = "wasm", wasm_bindgen)]
     pub fn verify(self, keys: &KeyChain) -> Result<DecodedClaims, GpuAttestationError> {
         // decoding the header beforehand is necessary to gain the kid
         let jwt_header = jsonwebtoken::decode_header(&self.overall)?;
@@ -68,7 +91,7 @@ impl EATToken {
             .ok_or(GpuAttestationError::Parse("missing kid from jwt header"))
             .and_then(|kid| keys.find(&kid).ok_or(GpuAttestationError::MissingKey))?;
 
-        let key = DecodingKey::from_jwk(&key)?;
+        let key = DecodingKey::from_jwk(key)?;
 
         // setup validation requirements (just expiration and algorithm for now)
         let mut validation = Validation::new(jwt_header.alg);

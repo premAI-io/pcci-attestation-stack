@@ -1,4 +1,4 @@
-use std::{cell::LazyCell, ops::Deref};
+use std::{ops::Deref, sync::LazyLock};
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -8,22 +8,25 @@ use reqwest::Url;
 
 use crate::error::GpuAttestationError;
 
-const NVIDIA_NRAS: LazyCell<Url> =
-    LazyCell::new(|| Url::parse("https://nras.attestation.nvidia.com").unwrap());
+static NVIDIA_NRAS: LazyLock<Url> =
+    LazyLock::new(|| Url::parse("https://nras.attestation.nvidia.com").unwrap());
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
 pub struct KeyChain(jwk::JwkSet);
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl KeyChain {
-    /// fetches the jwt keychain from the nvidia nras server
-    #[cfg_attr(target_family = "wasm", wasm_bindgen)]
-    pub async fn fetch_keychain() -> Result<Self, GpuAttestationError> {
+    pub async fn fetch_keychain() -> Result<KeyChain, GpuAttestationError> {
         let well_known = reqwest::get(NVIDIA_NRAS.join(".well-known/jwks.json").unwrap()).await?;
         let jwk_set: jwk::JwkSet = well_known.json().await?;
 
         Ok(KeyChain(jwk_set))
     }
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+/// Same as [`KeyChain:fetch_keychain`], put in for better wasm compatibility
+pub async fn fetch_keychain() -> Result<KeyChain, GpuAttestationError> {
+    KeyChain::fetch_keychain().await
 }
 
 impl Deref for KeyChain {

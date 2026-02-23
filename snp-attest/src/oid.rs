@@ -50,7 +50,7 @@ pub fn check_cert_ext_byte(
     }
     */
 
-    if ext.value.get(0) != Some(&0x02) {
+    if ext.value.first() != Some(&0x02) {
         return Err(anyhow!("invalid OID Type"));
     }
 
