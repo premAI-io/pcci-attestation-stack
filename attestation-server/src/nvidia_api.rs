@@ -2,6 +2,8 @@ use anyhow::Context;
 use nvat::{AttestationBuilder, SdkHandle, nonce::NvatNonce};
 use rocket::State;
 
+#[cfg(feature = "nvidia")]
+use crate::response::ApiError;
 use crate::{nonce::NonceParam, response::ApiJsonResult};
 
 #[rocket::get("/nvidia?<nonce>")]
@@ -9,7 +11,7 @@ use crate::{nonce::NonceParam, response::ApiJsonResult};
 pub async fn nvidia_attestation(
     nonce: NonceParam<Box<[u8; 32]>, 32>,
     sdk: &State<SdkHandle>,
-) -> ApiJsonResult<String> {
+) -> Result<String, ApiError> {
     let NonceParam(nonce) = nonce;
 
     // TEMPORARY FIX FOR BAD NVIDIA APIS
@@ -29,6 +31,5 @@ pub async fn nvidia_attestation(
         .detached_eat
         .as_str()
         .context("attestation contains bad string data")?
-        .to_string()
-        .into())
+        .to_string())
 }
