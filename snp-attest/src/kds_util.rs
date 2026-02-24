@@ -1,3 +1,4 @@
+use anyhow::Context;
 use sev::firmware::host::TcbVersion;
 use x509_cert::certificate::{CertificateInner, Rfc5280};
 
@@ -74,8 +75,15 @@ pub async fn get_vcek_tcb(
             get_query_tuple("ucodeSPL", tcb.microcode),
         ]);
 
-    let resp = req.send().await?.bytes().await?;
-    Ok(sev::certs::snp::Certificate::from_der(&resp).expect("invalid vcek from AMD KDS"))
+    let resp = req
+        .send()
+        .await?
+        .error_for_status()
+        .context("error returned from kds")?
+        .bytes()
+        .await?;
+
+    sev::certs::snp::Certificate::from_der(&resp).context("could not parse kds chain")
 }
 
 pub async fn get_cert_chain(product_name: &str) -> anyhow::Result<sev::certs::snp::ca::Chain> {
