@@ -13,7 +13,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::{nonce::SevNonce, oid};
 use der::Encode;
-use sev::{Generation, firmware::guest::AttestationReport, parser::ByteParser};
+use sev::{
+    CpuFamily, CpuModel, Generation, firmware::guest::AttestationReport, parser::ByteParser,
+};
 use x509_parser::prelude::*;
 
 use self::{
@@ -26,8 +28,8 @@ use self::{
 /// parsed commonly accessed fields
 #[allow(unused)]
 pub struct ParsedAttestation {
-    cpu_fam_id: u8,
-    cpu_mod_id: u8,
+    cpu_fam_id: CpuFamily,
+    cpu_mod_id: CpuModel,
     generation: Generation,
 
     report: AttestationReport,
@@ -56,6 +58,14 @@ impl ParsedAttestation {
             generation,
             report,
         })
+    }
+
+    pub fn cpu_fam_id(&self) -> CpuFamily {
+        self.cpu_fam_id
+    }
+
+    pub fn cpu_mod_id(&self) -> CpuModel {
+        self.cpu_mod_id
     }
 
     /// Verifies the attestation report against a certificate chain
