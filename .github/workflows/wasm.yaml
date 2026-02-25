@@ -47,9 +47,9 @@ jobs:
                   push: true
                   pull: true
                   cache-from: |
-                    type=registry,ref=${{ env.IMAGE_NAME }}:cache-build,compression=zstd
-                  cache-to: |
                     type=registry,ref=${{ env.IMAGE_NAME }}:cache-build
+                  cache-to: |
+                    type=registry,ref=${{ env.IMAGE_NAME }}:cache-build,compression=zstd
                   tags: |
                     ${{ env.IMAGE_NAME }}:latest-build
                     ${{ env.IMAGE_NAME }}:${{ github.sha }}-build
