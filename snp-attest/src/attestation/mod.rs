@@ -68,6 +68,10 @@ impl ParsedAttestation {
         self.cpu_mod_id
     }
 
+    pub fn generation(&self) -> Generation {
+        self.generation
+    }
+
     pub fn report(&self) -> &AttestationReport {
         &self.report
     }
