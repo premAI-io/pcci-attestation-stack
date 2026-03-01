@@ -7,6 +7,9 @@ pub use nvidia_attest;
 use reqwest::Url;
 pub use snp_attest;
 
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
+
 use crate::error::PremErr;
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
