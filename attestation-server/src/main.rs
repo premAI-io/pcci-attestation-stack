@@ -12,6 +12,9 @@ use tokio::sync::Mutex;
 
 use anyhow::Context;
 
+#[rocket::get("/modules")]
+fn modules() {}
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::builder()
@@ -31,8 +34,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .into();
 
         routes.extend(routes![sev_api::cpu_attestation]);
-        rocket
-            .manage(firmware)
+        rocket.manage(firmware)
     };
 
     #[cfg(feature = "nvidia")]
@@ -40,15 +42,12 @@ async fn main() -> Result<(), anyhow::Error> {
         use nvat::SdkHandle;
 
         let sdk = SdkHandle::get_handle()?;
-        
+
         routes.extend(routes![nvidia_api::nvidia_attestation]);
-        rocket
-            .manage(sdk)
+        rocket.manage(sdk)
     };
 
-    rocket
-        .mount("/attestation", routes)
-        .launch().await?;
+    rocket.mount("/attestation", routes).launch().await?;
 
     #[cfg(feature = "nvidia")]
     nvat::SdkHandle::get_handle()?.shutdown();

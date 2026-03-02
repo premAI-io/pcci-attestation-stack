@@ -22,6 +22,6 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 
-pub type ApiJsonResult<T> = Result<Json<T>, ApiError>;
+// pub type ApiJsonResult<T> = Result<Json<T>, ApiError>;
 
 // impl<T: std::error::Error> From<T> {}
