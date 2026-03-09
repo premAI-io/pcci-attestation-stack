@@ -8,7 +8,7 @@ use p256::{PublicKey, ecdsa::Signature};
 use crate::certificates::ca;
 use crate::dcap::TdQuote;
 use crate::dcap::parser::Parse;
-use crate::error::Error;
+use crate::error::TdxError;
 
 use crate::{
     certificates::CertificateChain,
@@ -30,7 +30,7 @@ pub struct QeReportCertificationData {
 }
 
 impl TryFrom<dcap::QeReportCertificationData<'_>> for QeReportCertificationData {
-    type Error = Error;
+    type Error = TdxError;
     fn try_from(value: dcap::QeReportCertificationData<'_>) -> Result<Self, Self::Error> {
         let qe_report = value.qe_report.clone();
         let certification_data = value.certification_data.try_into()?;
@@ -56,7 +56,7 @@ pub enum CertificationData {
 }
 
 impl TryFrom<dcap::QeCertificationData<'_>> for CertificationData {
-    type Error = Error;
+    type Error = TdxError;
     fn try_from(value: dcap::QeCertificationData<'_>) -> Result<Self, Self::Error> {
         use dcap::QeCertificationData::*;
 
@@ -84,7 +84,7 @@ pub struct Certification {
 }
 
 impl TryFrom<dcap::Certification<'_>> for Certification {
-    type Error = Error;
+    type Error = TdxError;
     fn try_from(value: dcap::Certification<'_>) -> Result<Self, Self::Error> {
         // let attestation_key = VerifyingKey::from_sec1_bytes(value.attestation_key)?;
         let attestation_key = decode_public_key(value.attestation_key)?;
@@ -107,7 +107,7 @@ pub struct Quote {
 }
 
 impl TryFrom<dcap::TdQuote<'_>> for Quote {
-    type Error = Error;
+    type Error = TdxError;
     fn try_from(value: dcap::TdQuote<'_>) -> Result<Self, Self::Error> {
         let header = value.quote_header.clone();
         let body = value.quote_body.clone();
@@ -122,7 +122,7 @@ impl TryFrom<dcap::TdQuote<'_>> for Quote {
 }
 
 impl Quote {
-    pub fn from_bytes(quote: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(quote: &[u8]) -> Result<Self, TdxError> {
         let quote = TdQuote::parse(quote)?;
         let quote = quote.try_into()?;
 

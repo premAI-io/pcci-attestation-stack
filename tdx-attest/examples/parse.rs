@@ -1,6 +1,7 @@
-use tdx_attest::Quote;
+use tdx_attest::{Quote, pcs::Pcs};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let input = std::fs::read("./examples/tdx_quote").unwrap();
     let quote = Quote::from_bytes(&input)?;
 
@@ -17,6 +18,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let chain = CertificateChain::parse_pem_chain(chain).unwrap();
     // // let chain = String::from_utf8_lossy(chain);
 
-    // println!("{quote:?}");
+    println!("{quote:?}");
+
+    let pcs = Pcs::new("https://pccs.phala.network")?;
+    let identity = pcs.fetch_qe_identity().await?;
+
+    println!("{identity:?}");
+
     Ok(())
 }

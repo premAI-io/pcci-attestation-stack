@@ -1,10 +1,20 @@
-use reqwest::{Client, IntoUrl, Url};
+pub mod qe;
+pub mod signed_response;
 
-use crate::{Quote, certificates::IntermediateCa, error::Error};
+use p256::ecdsa::Signature;
+use reqwest::{Client, IntoUrl, Url};
+use serde::Deserialize;
+
+use crate::{
+    Quote,
+    certificates::{CertificateChain, IntermediateCa},
+    error::{Context, TdxError},
+    pcs::{qe::EnclaveIdentity, signed_response::ParseSignedResponse},
+};
 
 const INTEL_PCS: &str = "https://api.trustedservices.intel.com/";
 
-struct Pcs {
+pub struct Pcs {
     base_url: Url,
     client: Client,
 }
@@ -34,9 +44,30 @@ impl Pcs {
         let text = self.client.get(url).send().await.unwrap().text().await;
         panic!("{text:?}");
     }
+
+    pub async fn fetch_qe_identity(&self) -> Result<EnclaveIdentity, TdxError> {
+        let mut url = self
+            .base_url
+            .join("/tdx/certification/v4/qe/identity")
+            .unwrap();
+
+        let signed_response = self
+            .client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .parse_signed_response("SGX-Enclave-Identity-Issuer-Chain", "enclaveIdentity")
+            .await?;
+
+        let identity: EnclaveIdentity = signed_response
+            .verify_signature()
+            .context("failed to verify pcs response")?;
+        Ok(identity)
+    }
 }
 
-// pub struct Collateral {}
+pub struct Collateral {}
 
 // pub fn fetch_collateral(quote: &Quote) -> Result<Collateral, Error> {
 //     todo!()
