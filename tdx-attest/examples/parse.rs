@@ -18,15 +18,15 @@ async fn main() -> anyhow::Result<()> {
     // let chain = CertificateChain::parse_pem_chain(chain).unwrap();
     // // let chain = String::from_utf8_lossy(chain);
 
-    println!("{quote:?}");
+    // println!("{quote:?}");
 
-    let fmspc = quote.certification().sgx_extensions()?.fmspc().unwrap();
-    dbg!(fmspc);
+    // let fmspc = quote.certification().sgx_extensions()?.fmspc().unwrap();
+    // dbg!(fmspc);
 
-    // let pcs = Pcs::new("https://pccs.phala.network")?;
-    // let identity = pcs.fetch_qe_identity().await?;
+    let pcs = Pcs::new("https://pccs.phala.network")?;
+    let identity = pcs.fetch_qe_identity().await?;
 
-    // println!("{identity:?}");
+    println!("{identity:?}");
 
     Ok(())
 }

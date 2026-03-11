@@ -3,52 +3,60 @@ use crate::{
     error::{Context, TdxError},
 };
 use p256::ecdsa::Signature;
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use signature::Verifier;
 
 use crate::certificates::CertificateChain;
 
 /// Every signed response from the PCS has these 3 things.
-pub struct SignedResponse {
+pub struct SignedResponse<T> {
     chain: CertificateChain,
     signature: Signature,
-    data: serde_json::Value,
+    data: T,
 }
 
-impl SignedResponse {
-    pub fn verify_signature<T: DeserializeOwned>(&self) -> Result<T, TdxError> {
-        // message is re-compacted json
+impl<T> SignedResponse<T> {
+    /// verifies the signature attached to the json data returned by the PCS. Unlocks the
+    /// inner data upon verification
+    ///
+    /// # Errors
+    /// Returns error upon either:
+    /// - the expected data of the
+    pub fn verify_signature(self) -> Result<T, TdxError>
+    where
+        T: Serialize,
+    {
+        // message is re-compacted json. Intel documentation explicitly states
+        // that the signature must be checked upon this format of data.
         let msg = serde_json::to_vec(&self.data)
             .context("failed re-serializing data into compact json")?;
-
-        let _ = dbg!(String::from_utf8_lossy(&msg));
 
         // verify signature and message using certificate chain
         self.chain
             .verify(&msg, &self.signature)
             .context("signed response has a bad signature")?;
 
-        let data = T::deserialize(&self.data).context("response data is in the wrong format")?;
-        Ok(data)
+        // let data = T::deserialize(&self.data).context("response data is in the wrong format")?;
+        Ok(self.data)
     }
 }
 
 /// Helper method for [`reqwest::Response`] to parse a signed response off of pcs
 pub(super) trait ParseSignedResponse {
-    async fn parse_signed_response(
+    async fn parse_signed_response<T: Serialize + DeserializeOwned>(
         self,
         chain_header: &str,
         data_field: &str,
-    ) -> Result<SignedResponse, TdxError>;
+    ) -> Result<SignedResponse<T>, TdxError>;
 }
 
 impl ParseSignedResponse for reqwest::Response {
-    async fn parse_signed_response(
+    async fn parse_signed_response<T: Serialize + DeserializeOwned>(
         self,
         chain_header: &str,
         data_field: &str,
-    ) -> Result<SignedResponse, TdxError> {
+    ) -> Result<SignedResponse<T>, TdxError> {
         let chain = self
             .headers()
             .get(chain_header)
@@ -74,6 +82,10 @@ impl ParseSignedResponse for reqwest::Response {
         let data = map
             .remove(data_field)
             .context("invalid data object does not contain specified data field")?;
+
+        // we deserialize the data here and seal it in the signed response
+        // it will be available only upon signature verification
+        let data = T::deserialize(data).context("failed to deserialize signed data")?;
 
         Ok(SignedResponse {
             chain,

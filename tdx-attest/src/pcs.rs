@@ -63,6 +63,7 @@ impl Pcs {
         let identity: EnclaveIdentity = signed_response
             .verify_signature()
             .context("failed to verify pcs response")?;
+
         Ok(identity)
     }
 

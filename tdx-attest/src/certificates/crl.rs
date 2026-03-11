@@ -20,6 +20,8 @@ pub struct Crl {
     signature: Signature,
 }
 
+impl sealed::Sealed for Crl {}
+
 impl Crl {
     pub fn from_pem(
         verifier: impl Verifier<Signature>,
@@ -64,7 +66,6 @@ impl Crl {
     }
 }
 
-impl sealed::Sealed for Crl {}
 pub trait VerifyCrl<Tbs>: sealed::Sealed {
     fn check_revoked(&self, tbs: &Tbs) -> Result<(), CertificateError>;
 }
