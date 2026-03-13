@@ -1,6 +1,6 @@
 pub mod error;
 
-use libattest::{Module, Modules};
+use libattest::{CpuModule, GpuModule, Modules};
 use nvidia_attest::{EATToken, keychain::KeyChain, nonce::NvidiaNonce};
 use snp_attest::{ParsedAttestation, nonce::SevNonce};
 
@@ -63,10 +63,7 @@ impl Client {
         let response: Modules = self.reqwest_client.get(url).send().await?.json().await?;
 
         // check whether the modules are enough to attest a device (a gpu and a cpu)
-        response
-            .is_complete()
-            .then_some(response)
-            .ok_or(PremErr::Incomplete)
+        Ok(response)
     }
 
     /// Requests and parses a SEV-SNP attestation from the attestation server.
@@ -151,12 +148,14 @@ impl Client {
     pub async fn attest(&self) -> Result<Modules, PremErr> {
         let modules = self.request_modules().await?;
 
-        for module in modules.modules() {
-            match module {
-                Module::Nvidia => self.attest_nvidia().await?,
-                Module::Sev => self.attest_sev().await?,
-                _ => unimplemented!(),
-            }
+        match modules.cpu() {
+            CpuModule::Sev => self.attest_sev().await?,
+            _ => unimplemented!(),
+        }
+
+        match modules.gpu() {
+            Some(GpuModule::Nvidia) => self.attest_nvidia().await?,
+            _ => unimplemented!(),
         }
 
         Ok(modules)

@@ -6,9 +6,14 @@ mod nvidia_api;
 #[cfg(feature = "sev")]
 mod sev_api;
 
-use libattest::modules::{Module, Modules, ModulesBuilder};
+use std::ops::Deref;
+
+use libattest::{
+    CpuModule, GpuModule,
+    modules::{Modules, ModulesBuilder},
+};
 use log::LevelFilter;
-use rocket::routes;
+use rocket::{State, routes};
 use tokio::sync::Mutex;
 
 use anyhow::Context;
@@ -16,14 +21,25 @@ use anyhow::Context;
 use crate::response::ApiJsonResult;
 
 #[rocket::get("/modules")]
-fn modules() -> ApiJsonResult<Modules> {
-    let modules = ModulesBuilder::new()
-        .insert_if(Module::Nvidia, cfg!(feature = "nvidia"))
-        .insert_if(Module::Sev, cfg!(feature = "sev"))
-        .insert_if(Module::Tdx, cfg!(feature = "tdx"))
-        .build();
+fn modules(modules: &State<Modules>) -> ApiJsonResult<&Modules> {
+    response::ok(modules.deref())
+}
 
-    response::ok(modules)
+fn get_modules() -> anyhow::Result<Modules> {
+    #[cfg(feature = "sev")]
+    let cpu = CpuModule::Sev;
+    #[cfg(feature = "tdx")]
+    let cpu = CpuModule::Tdx;
+
+    let gpu: Option<GpuModule> = None;
+    #[cfg(feature = "nvidia")]
+    let gpu = Some(GpuModule::Nvidia);
+
+    ModulesBuilder::new()
+        .with_cpu(cpu)
+        .with_gpu(gpu)
+        .build()
+        .context("cannot build the system with this set of modules")
 }
 
 #[tokio::main]
@@ -38,6 +54,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // advertise server capabilities
     routes.extend(routes![modules]);
+
+    let modules = get_modules()?;
+    let rocket = rocket.manage(modules);
 
     #[cfg(feature = "sev")]
     let rocket = {

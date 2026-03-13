@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_family = "wasm")]
@@ -7,87 +5,63 @@ use wasm_bindgen::prelude::*;
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, Clone, Copy)]
-pub enum Module {
+pub enum CpuModule {
     Sev,
     Tdx,
-    Nvidia,
 }
 
-impl Module {
-    pub fn is_cpu(&self) -> bool {
-        match self {
-            Module::Nvidia => false,
-            Module::Sev | Module::Tdx => true,
-        }
-    }
-
-    pub fn is_gpu(&self) -> bool {
-        match self {
-            Module::Nvidia => true,
-            Module::Sev | Module::Tdx => false,
-        }
-    }
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, Clone, Copy)]
+pub enum GpuModule {
+    Nvidia,
 }
 
 #[derive(Serialize, Deserialize)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct Modules {
-    modules: Vec<Module>,
+    cpu: CpuModule,
+    gpu: Option<GpuModule>,
 }
 
 impl Modules {
-    pub fn modules(&self) -> &[Module] {
-        &self.modules
-    }
-}
-
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
-impl Modules {
-    /// Returns whether the available modules specified make up a complete
-    /// attestable system (cpu, gpu, ecc..)
-    pub fn is_complete(&self) -> bool {
-        // reduces the modules to find both at least one cpu module
-        // and one gpu module
-        let (cpu, gpu) = self
-            .modules
-            .iter()
-            .fold((false, false), |(cpu, gpu), module| {
-                (cpu || module.is_cpu(), gpu || module.is_gpu())
-            });
-
-        // returns true when there's moth a cpu and gpu available in the system
-        cpu && gpu
+    pub fn cpu(&self) -> CpuModule {
+        self.cpu
     }
 
-    pub fn modules_owned(&self) -> Vec<Module> {
-        self.modules.clone()
+    pub fn gpu(&self) -> Option<GpuModule> {
+        self.gpu
+    }
+
+    pub fn has_gpu(&self) -> bool {
+        self.gpu.is_some()
     }
 }
 
 pub struct ModulesBuilder {
-    modules: HashSet<Module>,
+    cpu: Option<CpuModule>,
+    gpu: Option<GpuModule>,
 }
 
 impl ModulesBuilder {
     pub fn new() -> Self {
         Self {
-            modules: HashSet::new(),
+            cpu: None,
+            gpu: None,
         }
     }
 
-    pub fn insert(mut self, module: Module) -> Self {
-        self.modules.insert(module);
-        self
+    pub fn with_cpu(self, cpu: CpuModule) -> Self {
+        let cpu = Some(cpu);
+        Self { cpu, ..self }
     }
 
-    pub fn insert_if(self, module: Module, predicate: bool) -> Self {
-        if predicate { self.insert(module) } else { self }
+    pub fn with_gpu(self, gpu: Option<GpuModule>) -> Self {
+        Self { gpu, ..self }
     }
 
-    pub fn build(self) -> Modules {
-        Modules {
-            modules: self.modules.into_iter().collect(),
-        }
+    pub fn build(self) -> Option<Modules> {
+        let cpu = self.cpu?;
+        Some(Modules { cpu, gpu: self.gpu })
     }
 }
 
