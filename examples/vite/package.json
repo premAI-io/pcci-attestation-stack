@@ -13,7 +13,7 @@
     "vite": "^8.0.0"
   },
   "dependencies": {
-    "prem-rs": "../../prem-rs/pkg",
+    "@premAI-io/prem-rs": "^0.1.3",
     "node-emoji": "^2.2.0",
     "vite-plugin-wasm": "^3.5.0"
   }

@@ -19,6 +19,11 @@
             --scope premai-io \ # repo owner
             prem-rs
 
+## NodeJS `prem-rs` Testing
+
+* use _npm_ / _bun_ link (`npm link`) in [`./prem-rs/pkg`](./prem-rs/pkg)
+* link the local package in an [example](./examples) using `bun link @premAI-io/prem-rs`
+
 ## TODOs
 
 - use `vcpkg` for cross compilation?
