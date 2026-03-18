@@ -6,8 +6,7 @@ use snp_attest::{ParsedAttestation, nonce::SevNonce};
 
 pub use nvidia_attest;
 use reqwest::{
-    Url,
-    header::{HeaderMap, HeaderValue},
+    Url, header::{HeaderMap, HeaderValue}
 };
 pub use snp_attest;
 
@@ -16,11 +15,39 @@ use wasm_bindgen::prelude::*;
 
 use crate::error::PremErr;
 
+/// Generic per-request query parameters.
+///
+/// The `nonce` key is reserved and will be rejected.
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+pub struct QueryParams(Vec<(String, String)>);
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl QueryParams {
+    #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
+    pub fn new() -> Self {
+        Self(vec![])
+    }
+
+    /// Appends a query parameter. Returns `Err` if `key` is `"nonce"` (reserved).
+    pub fn with(mut self, key: &str, value: &str) -> Result<Self, PremErr> {
+        if key == "nonce" {
+            return Err(PremErr::ForbiddenQueryParam);
+        }
+        self.0.push((key.to_string(), value.to_string()));
+        Ok(self)
+    }
+}
+
+impl Default for QueryParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct ClientBuilder {
     url: String,
     headers: HeaderMap,
-    query_params: Vec<(String, String)>,
 }
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
@@ -30,7 +57,6 @@ impl ClientBuilder {
         Self {
             url: url.to_string(),
             headers: HeaderMap::default(),
-            query_params: vec![],
         }
     }
 
@@ -38,17 +64,6 @@ impl ClientBuilder {
     pub fn with_authorization(mut self, token: &str) -> Result<Self, PremErr> {
         self.headers
             .insert("Authorization", HeaderValue::from_str(token)?);
-
-        Ok(self)
-    }
-
-    /// Sets query parameter
-    pub fn with_query(mut self, key: &str, value: &str) -> Result<Self, PremErr> {
-        if key == "nonce" {
-            return Err(PremErr::ForbiddenQueryParam);
-        }
-
-        self.query_params.push((key.to_string(), value.to_string()));
 
         Ok(self)
     }
@@ -61,7 +76,6 @@ impl ClientBuilder {
         Ok(Client {
             url: self.url.parse().map_err(PremErr::Parse)?,
             reqwest_client,
-            query_params: self.query_params,
         })
     }
 }
@@ -70,18 +84,23 @@ impl ClientBuilder {
 pub struct Client {
     url: Url,
     reqwest_client: reqwest::Client,
-    query_params: Vec<(String, String)>
 }
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Client {
     /// Gather available attestable modules from remote attestation endpoint
-    pub async fn request_modules(&self) -> Result<libattest::Modules, PremErr> {
+    pub async fn request_modules(&self, query: Option<&QueryParams>) -> Result<libattest::Modules, PremErr> {
         let url = self.url.join("/attestation/modules").unwrap();
 
-        let response: Modules = self.reqwest_client.get(url).query(&self.query_params).send().await?.json().await?;
+        let response = self
+            .reqwest_client
+            .get(url)
+            .query(&query.unwrap_or(&QueryParams::default()).0)
+            .send()
+            .await?
+            .json()
+            .await?;
 
-        // check whether the modules are enough to attest a device (a gpu and a cpu)
         Ok(response)
     }
 
@@ -91,22 +110,18 @@ impl Client {
     /// This method exposes core functionality and does not perform cryptographic
     /// or measurement checks on the attestation. If you want to perform end-to-end attestation
     /// please refer to [`Self::attest_sev`]
-    pub async fn request_sev(&self, nonce: &SevNonce) -> Result<ParsedAttestation, PremErr> {
+    pub async fn request_sev(&self, nonce: &SevNonce, query: &QueryParams) -> Result<ParsedAttestation, PremErr> {
         let url = self.url.join("/attestation/cpu").unwrap();
 
-        // build the request with parameter ?nonce=<nonce> encoded in hex
         let response = self
             .reqwest_client
             .get(url)
-            .query(&self.query_params)
+            .query(&query.0)
             .query(&[("nonce", nonce.to_hex())])
             .send()
             .await?;
 
-        // decode the raw byte stream from the http request
         let attestation = response.error_for_status()?.bytes().await?;
-
-        // parse attestation using snp-attest crate
         let attestation = ParsedAttestation::new(&attestation)?;
 
         Ok(attestation)
@@ -118,13 +133,13 @@ impl Client {
     /// This method exposes core functionality and does not perform cryptographic
     /// or measurement checks on the attestation. If you want to perform end-to-end attestation
     /// please refer to [`Self::attest_nvidia`]
-    pub async fn request_nvidia(&self, nonce: &NvidiaNonce) -> Result<EATToken, PremErr> {
+    pub async fn request_nvidia(&self, nonce: &NvidiaNonce, query: &QueryParams) -> Result<EATToken, PremErr> {
         let url = self.url.join("/attestation/nvidia").unwrap();
 
         let response = self
             .reqwest_client
             .get(url)
-            .query(&self.query_params)
+            .query(&query.0)
             .query(&[("nonce", nonce.to_hex())])
             .send()
             .await?;
@@ -136,10 +151,10 @@ impl Client {
     }
 
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
-    pub async fn attest_sev(&self) -> Result<(), PremErr> {
+    pub async fn attest_sev(&self, query: Option<&QueryParams>) -> Result<(), PremErr> {
         let nonce = SevNonce::generate();
 
-        let attestation = self.request_sev(&nonce).await?;
+        let attestation = self.request_sev(&nonce, query.unwrap_or(&QueryParams::default())).await?;
         let keychain = snp_attest::kds::fetch_certificates(&attestation).await?;
 
         attestation.verify(&keychain, &nonce)?;
@@ -150,11 +165,11 @@ impl Client {
     }
 
     /// Completes end-to-end nvidia attestation. Generates nonce and validates claims all in one
-    pub async fn attest_nvidia(&self) -> Result<(), PremErr> {
+    pub async fn attest_nvidia(&self, query: Option<&QueryParams>) -> Result<(), PremErr> {
         let nonce = NvidiaNonce::generate();
         let keychain = KeyChain::fetch_keychain().await?;
 
-        let attestation = self.request_nvidia(&nonce).await?;
+        let attestation = self.request_nvidia(&nonce, query.unwrap_or(&QueryParams::default())).await?;
         let claims = attestation.verify(&keychain)?;
 
         claims.validate(&nonce)?;
@@ -166,16 +181,16 @@ impl Client {
     /// - Gathers modules to attest from attestation server
     /// - Iterates through each module and performs end-to-end attestation
     /// - Returns the list of attested modules
-    pub async fn attest(&self) -> Result<Modules, PremErr> {
-        let modules = self.request_modules().await?;
+    pub async fn attest(&self, query: Option<&QueryParams>) -> Result<Modules, PremErr> {
+        let modules = self.request_modules(query).await?;
 
         match modules.cpu() {
-            CpuModule::Sev => self.attest_sev().await?,
+            CpuModule::Sev => self.attest_sev(query).await?,
             _ => unimplemented!(),
         }
 
         match modules.gpu() {
-            Some(GpuModule::Nvidia) => self.attest_nvidia().await?,
+            Some(GpuModule::Nvidia) => self.attest_nvidia(query).await?,
             _ => unimplemented!(),
         }
 

@@ -21,5 +21,5 @@ async fn main() {
     // let parsed = attestation.verify(&keychain).unwrap();
     // parsed.validate(&nonce).unwrap();
 
-    client.attest().await.unwrap();
+    client.attest(None).await.unwrap();
 }
