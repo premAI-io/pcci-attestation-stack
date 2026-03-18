@@ -19,6 +19,7 @@ use crate::error::PremErr;
 ///
 /// The `nonce` key is reserved and will be rejected.
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[derive(Clone)]
 pub struct QueryParams(Vec<(String, String)>);
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
@@ -89,13 +90,13 @@ pub struct Client {
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Client {
     /// Gather available attestable modules from remote attestation endpoint
-    pub async fn request_modules(&self, query: Option<&QueryParams>) -> Result<libattest::Modules, PremErr> {
+    pub async fn request_modules(&self, query: Option<QueryParams>) -> Result<libattest::Modules, PremErr> {
         let url = self.url.join("/attestation/modules").unwrap();
 
         let response = self
             .reqwest_client
             .get(url)
-            .query(&query.unwrap_or(&QueryParams::default()).0)
+            .query(&query.unwrap_or_default().0)
             .send()
             .await?
             .json()
@@ -151,10 +152,10 @@ impl Client {
     }
 
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
-    pub async fn attest_sev(&self, query: Option<&QueryParams>) -> Result<(), PremErr> {
+    pub async fn attest_sev(&self, query: Option<QueryParams>) -> Result<(), PremErr> {
         let nonce = SevNonce::generate();
 
-        let attestation = self.request_sev(&nonce, query.unwrap_or(&QueryParams::default())).await?;
+        let attestation = self.request_sev(&nonce, &query.unwrap_or_default()).await?;
         let keychain = snp_attest::kds::fetch_certificates(&attestation).await?;
 
         attestation.verify(&keychain, &nonce)?;
@@ -165,11 +166,11 @@ impl Client {
     }
 
     /// Completes end-to-end nvidia attestation. Generates nonce and validates claims all in one
-    pub async fn attest_nvidia(&self, query: Option<&QueryParams>) -> Result<(), PremErr> {
+    pub async fn attest_nvidia(&self, query: Option<QueryParams>) -> Result<(), PremErr> {
         let nonce = NvidiaNonce::generate();
         let keychain = KeyChain::fetch_keychain().await?;
 
-        let attestation = self.request_nvidia(&nonce, query.unwrap_or(&QueryParams::default())).await?;
+        let attestation = self.request_nvidia(&nonce, &query.unwrap_or_default()).await?;
         let claims = attestation.verify(&keychain)?;
 
         claims.validate(&nonce)?;
@@ -181,16 +182,16 @@ impl Client {
     /// - Gathers modules to attest from attestation server
     /// - Iterates through each module and performs end-to-end attestation
     /// - Returns the list of attested modules
-    pub async fn attest(&self, query: Option<&QueryParams>) -> Result<Modules, PremErr> {
-        let modules = self.request_modules(query).await?;
+    pub async fn attest(&self, query: QueryParams) -> Result<Modules, PremErr> {
+        let modules = self.request_modules(Some(query.clone())).await?;
 
         match modules.cpu() {
-            CpuModule::Sev => self.attest_sev(query).await?,
+            CpuModule::Sev => self.attest_sev(Some(query.clone())).await?,
             _ => unimplemented!(),
         }
 
         match modules.gpu() {
-            Some(GpuModule::Nvidia) => self.attest_nvidia(query).await?,
+            Some(GpuModule::Nvidia) => self.attest_nvidia(Some(query)).await?,
             _ => unimplemented!(),
         }
 
