@@ -182,16 +182,16 @@ impl Client {
     /// - Gathers modules to attest from attestation server
     /// - Iterates through each module and performs end-to-end attestation
     /// - Returns the list of attested modules
-    pub async fn attest(&self, query: QueryParams) -> Result<Modules, PremErr> {
-        let modules = self.request_modules(Some(query.clone())).await?;
+    pub async fn attest(&self, query: Option<QueryParams>) -> Result<Modules, PremErr> {
+        let modules = self.request_modules(query.clone()).await?;
 
         match modules.cpu() {
-            CpuModule::Sev => self.attest_sev(Some(query.clone())).await?,
+            CpuModule::Sev => self.attest_sev(query.clone()).await?,
             _ => unimplemented!(),
         }
 
         match modules.gpu() {
-            Some(GpuModule::Nvidia) => self.attest_nvidia(Some(query)).await?,
+            Some(GpuModule::Nvidia) => self.attest_nvidia(query.clone()).await?,
             _ => unimplemented!(),
         }
 
