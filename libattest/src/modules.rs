@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_family = "wasm")]
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, Clone, Copy)]
@@ -16,7 +16,7 @@ pub enum GpuModule {
     Nvidia,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct Modules {
     cpu: CpuModule,
