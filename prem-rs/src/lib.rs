@@ -134,7 +134,7 @@ impl Client {
     /// This method exposes core functionality and does not perform cryptographic
     /// or measurement checks on the attestation. If you want to perform end-to-end attestation
     /// please refer to [`Self::attest_nvidia`]
-    pub async fn request_nvidia(&self, nonce: &NvidiaNonce, query: &QueryParams) -> Result<EATToken, PremErr> {
+    pub async fn request_nvidia(&self, nonce: &NvidiaNonce, query: &QueryParams) -> Result<(EATToken, HeaderMap), PremErr> {
         let url = self.url.join("/attestation/nvidia").unwrap();
 
         let response = self
@@ -145,10 +145,11 @@ impl Client {
             .send()
             .await?;
 
-        let response = response.error_for_status()?.text().await?;
-        let response = EATToken::parse(&response)?;
+        let headers = response.headers().clone();
+        let response_text = response.error_for_status()?.text().await?;
+        let eat_token = EATToken::parse(&response_text)?;
 
-        Ok(response)
+        Ok((eat_token, headers))
     }
 
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
@@ -166,23 +167,25 @@ impl Client {
     }
 
     /// Completes end-to-end nvidia attestation. Generates nonce and validates claims all in one
-    pub async fn attest_nvidia(&self, query: Option<QueryParams>) -> Result<(), PremErr> {
+    pub async fn attest_nvidia(&self, query: Option<QueryParams>) -> Result<HeaderMap, PremErr> {
         let nonce = NvidiaNonce::generate();
         let keychain = KeyChain::fetch_keychain().await?;
 
-        let attestation = self.request_nvidia(&nonce, &query.unwrap_or_default()).await?;
+        let (attestation, headers) = self.request_nvidia(&nonce, &query.unwrap_or_default()).await?;
         let claims = attestation.verify(&keychain)?;
 
         claims.validate(&nonce)?;
 
-        Ok(())
+        Ok(headers)
     }
 
     /// Steps:
     /// - Gathers modules to attest from attestation server
     /// - Iterates through each module and performs end-to-end attestation
     /// - Returns the list of attested modules
-    pub async fn attest(&self, query: Option<QueryParams>) -> Result<Modules, PremErr> {
+    pub async fn attest(&self, query: Option<QueryParams>) -> Result<(Modules, (Option<HeaderMap>, Option<HeaderMap>)), PremErr> {
+        // cpu and gpu response headers
+        let mut headers: (Option<HeaderMap>, Option<HeaderMap>) = (None, None);
         let modules = self.request_modules(query.clone()).await?;
 
         match modules.cpu() {
@@ -191,10 +194,10 @@ impl Client {
         }
 
         match modules.gpu() {
-            Some(GpuModule::Nvidia) => self.attest_nvidia(query.clone()).await?,
+            Some(GpuModule::Nvidia) => headers.1 = Some(self.attest_nvidia(query.clone()).await?),
             _ => unimplemented!(),
         }
 
-        Ok(modules)
+        Ok((modules, headers))
     }
 }
