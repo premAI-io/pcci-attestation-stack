@@ -4,8 +4,8 @@ pub mod verification;
 pub use modules::*;
 pub use verification::*;
 
-#[cfg(target_family = "wasm")]
-use wasm_bindgen::prelude::*;
+//#[cfg(target_family = "wasm")]
+//use wasm_bindgen::prelude::*;
 
 // #[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
 #[derive(Debug, PartialEq, Eq)]

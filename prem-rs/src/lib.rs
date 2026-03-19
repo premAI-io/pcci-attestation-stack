@@ -15,6 +15,63 @@ use wasm_bindgen::prelude::*;
 
 use crate::error::PremErr;
 
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[derive(Clone)]
+pub struct AttestHeaders {
+    cpu: Option<ResponseHeaders>,
+    gpu: Option<ResponseHeaders>
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl AttestHeaders {
+    pub fn cpu(&self) -> Option<ResponseHeaders> {
+        self.cpu.clone()
+    }
+
+    pub fn gpu(&self) -> Option<ResponseHeaders> {
+        self.gpu.clone()
+    }
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[derive(Clone)]
+pub struct AttestResult {
+    modules: Modules,
+    headers: AttestHeaders,
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl AttestResult {
+    pub fn modules(&self) -> Modules {
+        self.modules
+    }
+
+    pub fn headers(&self) -> AttestHeaders {
+        self.headers.clone()
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+pub struct ResponseHeaders(HeaderMap);
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl ResponseHeaders {
+    pub fn get(&self, name: &str) -> Option<String> {
+        self.0.get(name)?.to_str().ok().map(String::from)
+    }
+
+    pub fn keys(&self) -> Vec<String> {                                                                                                           
+        self.0.keys().map(|k| k.to_string()).collect()                                                                                            
+    }
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+pub struct NvidiaAttestResult {
+    eat_token: EATToken,
+    headers: ResponseHeaders,
+}
+
 /// Generic per-request query parameters.
 ///
 /// The `nonce` key is reserved and will be rejected.
@@ -134,7 +191,7 @@ impl Client {
     /// This method exposes core functionality and does not perform cryptographic
     /// or measurement checks on the attestation. If you want to perform end-to-end attestation
     /// please refer to [`Self::attest_nvidia`]
-    pub async fn request_nvidia(&self, nonce: &NvidiaNonce, query: &QueryParams) -> Result<EATToken, PremErr> {
+    pub async fn request_nvidia(&self, nonce: &NvidiaNonce, query: &QueryParams) -> Result<NvidiaAttestResult, PremErr> {
         let url = self.url.join("/attestation/nvidia").unwrap();
 
         let response = self
@@ -145,10 +202,11 @@ impl Client {
             .send()
             .await?;
 
-        let response = response.error_for_status()?.text().await?;
-        let response = EATToken::parse(&response)?;
+        let headers = response.headers().clone();
+        let response_text = response.error_for_status()?.text().await?;
+        let eat_token = EATToken::parse(&response_text)?;
 
-        Ok(response)
+        Ok(NvidiaAttestResult{ eat_token: eat_token, headers: ResponseHeaders(headers) })
     }
 
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
@@ -166,23 +224,24 @@ impl Client {
     }
 
     /// Completes end-to-end nvidia attestation. Generates nonce and validates claims all in one
-    pub async fn attest_nvidia(&self, query: Option<QueryParams>) -> Result<(), PremErr> {
+    pub async fn attest_nvidia(&self, query: Option<QueryParams>) -> Result<ResponseHeaders, PremErr> {
         let nonce = NvidiaNonce::generate();
         let keychain = KeyChain::fetch_keychain().await?;
 
-        let attestation = self.request_nvidia(&nonce, &query.unwrap_or_default()).await?;
-        let claims = attestation.verify(&keychain)?;
+        let attest_result = self.request_nvidia(&nonce, &query.unwrap_or_default()).await?;
+        let claims = attest_result.eat_token.verify(&keychain)?;
 
         claims.validate(&nonce)?;
 
-        Ok(())
+        Ok(attest_result.headers)
     }
 
     /// Steps:
     /// - Gathers modules to attest from attestation server
     /// - Iterates through each module and performs end-to-end attestation
     /// - Returns the list of attested modules
-    pub async fn attest(&self, query: Option<QueryParams>) -> Result<Modules, PremErr> {
+    pub async fn attest(&self, query: Option<QueryParams>) -> Result<AttestResult, PremErr> {
+        // get modules
         let modules = self.request_modules(query.clone()).await?;
 
         match modules.cpu() {
@@ -190,11 +249,11 @@ impl Client {
             _ => unimplemented!(),
         }
 
-        match modules.gpu() {
-            Some(GpuModule::Nvidia) => self.attest_nvidia(query.clone()).await?,
+        let gpu_headers = match modules.gpu() {
+            Some(GpuModule::Nvidia) => Some(self.attest_nvidia(query.clone()).await?),
             _ => unimplemented!(),
-        }
+        };
 
-        Ok(modules)
+        Ok(AttestResult { modules, headers: AttestHeaders { cpu: None, gpu: gpu_headers } })
     }
 }

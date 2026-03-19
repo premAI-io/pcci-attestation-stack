@@ -183,7 +183,7 @@ jobs:
 
               run: |
                 wasm-pack build --target nodejs --scope ${{ github.repository_owner }} -d pkg-node prem-rs
-                wasm-pack build --target nodejs --scope ${{ github.repository_owner }} -d pkg prem-rs
+                wasm-pack build --target bundler --scope ${{ github.repository_owner }} -d pkg prem-rs
                 cd prem-rs
                 PKG_NAME=$(jq -r .name pkg/package.json | cut -d'/' -f2- | sed 's/\-/_/g')
 
