@@ -21,6 +21,7 @@ pub mod dcap;
 pub mod error;
 pub mod keychain;
 pub mod pcs;
+pub mod verify;
 
 #[derive(Debug)]
 pub struct QeReportCertificationData {
@@ -52,13 +53,20 @@ impl CertificationData {
             _ => None,
         }
     }
+
+    pub fn qe_report(&self) -> Option<&QeReportCertificationData> {
+        match self {
+            Self::QeReportCertificationData(data) => Some(&data),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct Certification {
-    attestation_signature: Signature,
-    attestation_key: VerifyingKey,
-    data: CertificationData,
+    pub(crate) attestation_signature: Signature,
+    pub(crate) attestation_key: VerifyingKey,
+    pub(crate) data: CertificationData,
 }
 
 impl Certification {
@@ -86,12 +94,17 @@ impl Certification {
 
 #[derive(Debug)]
 pub struct Quote {
-    header: QuoteHeader,
-    body: QuoteBody,
-    certification: Certification,
+    pub(crate) header: QuoteHeader,
+    pub(crate) body: QuoteBody,
+    pub(crate) certification: Certification,
 }
 
 impl Quote {
+    #[must_use]
+    pub fn header(&self) -> &QuoteHeader {
+        &self.header
+    }
+
     #[must_use]
     pub fn body(&self) -> &QuoteBody {
         &self.body

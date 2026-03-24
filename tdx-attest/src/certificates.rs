@@ -167,6 +167,7 @@ pub struct CertificateChain {
 }
 
 impl Verifier<Signature> for CertificateChain {
+    // #[must_use]
     fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), signature::Error> {
         let certificate = self.chain.last().or(self.anchor).unwrap();
         certificate.verify(msg, signature)

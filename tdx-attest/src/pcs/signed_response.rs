@@ -4,6 +4,8 @@ use crate::{
     ca::INTEL_CA,
     error::{Context, TdxError},
 };
+use anyhow::bail;
+use chrono::Utc;
 use p256::ecdsa::Signature;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -11,12 +13,21 @@ use signature::Verifier;
 
 use crate::certificates::CertificateChain;
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct Header {
+    issue_date: chrono::DateTime<Utc>,
+    next_update: chrono::DateTime<Utc>,
+}
+
 /// Every signed response from the PCS has these 3 things.
 pub struct SignedResponse<T> {
     chain: CertificateChain,
     signature: Signature,
 
+    header: Header,
     data: serde_json::Value,
+
     _data_type: PhantomData<T>,
 }
 
@@ -31,6 +42,16 @@ impl<T> SignedResponse<T> {
     where
         T: DeserializeOwned,
     {
+        let now = chrono::Utc::now();
+
+        if self.header.issue_date > now {
+            return TdxError::msg("pcs response signature has a later issue_date than now");
+        }
+
+        if self.header.next_update < now {
+            return TdxError::msg("pcs response signature has expired content");
+        }
+
         // message is re-compacted json. Intel documentation explicitly states
         // that the signature must be checked upon this format of data.
         let msg = serde_json::to_vec(&self.data)
@@ -88,9 +109,13 @@ impl ParseSignedResponse for reqwest::Response {
             .remove(data_field)
             .context("invalid data object does not contain specified data field")?;
 
+        let header = Header::deserialize(&data)
+            .context("failed to deserialize signature header from pcs response")?;
+
         Ok(SignedResponse {
             chain,
             signature,
+            header,
             data,
             _data_type: PhantomData,
         })

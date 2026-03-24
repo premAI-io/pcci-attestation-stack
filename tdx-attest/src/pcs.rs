@@ -42,7 +42,8 @@ impl Pcs {
     pub async fn fetch_crl(&self, intermediate_ca: IntermediateCa) -> Result<Crl, TdxError> {
         let mut url = self.base_url.join("/sgx/certification/v4/pckcrl").unwrap();
         url.query_pairs_mut()
-            .append_pair("ca", intermediate_ca.as_str());
+            .append_pair("ca", intermediate_ca.as_str())
+            .append_pair("encoding", "pem");
 
         let response = self.client.get(url).send().await?.error_for_status()?;
         let certificate_chain = response
@@ -51,11 +52,14 @@ impl Pcs {
             .context("crl response does not contain a certificate chain")?;
 
         let chain = CertificateChain::with_anchor(&INTEL_CA)
-            .parse_pem_chain(certificate_chain.as_bytes())
+            .parse_pem_chain(&urlencoding::decode_binary(certificate_chain.as_bytes()))
             .context("failed parsing crl certificate chain")?;
 
         let crl = response.text().await?;
-        let crl = Crl::from_pem(&chain, crl).context("failed parsing and verifying crl")?;
+
+        // TODO: review this very bad thing. We really should build our own pccs already.
+        let crl = hex::decode(crl)?;
+        let crl = Crl::from_der(&chain, crl).context("failed parsing and verifying crl")?;
 
         Ok(crl)
     }
@@ -105,22 +109,30 @@ impl Pcs {
 
         Ok(tcb_info)
     }
+
+    pub async fn fetch_collateral(&self, quote: &Quote) -> Result<Collateral, TdxError> {
+        // extract fmspc from quote
+        let fmspc = quote
+            .certification()
+            .sgx_extensions()
+            .context("failed getting sgx extensions from quote")?
+            .fmspc()
+            .context("sgx extensions do not contain fmspc")?;
+
+        let tcb_info = self.fetch_tcb_info(fmspc).await?;
+        let crl = self.fetch_crl(IntermediateCa::Processor).await?;
+        let qe_identity = self.fetch_qe_identity().await?;
+
+        Ok(Collateral {
+            crl,
+            qe_identity,
+            tcb_info,
+        })
+    }
 }
 
-pub struct Collateral {}
-
-// pub fn fetch_collateral(quote: &Quote) -> Result<Collateral, Error> {
-//     todo!()
-// }
-
-// #[cfg(test)]
-// mod test {
-//     use crate::pcs::Pcs;
-
-//     #[tokio::test]
-//     async fn fetch_crl() {
-//         let pcs = Pcs::default();
-//         pcs.fetch_crl(crate::certificates::IntermediateCa::Platform)
-//             .await;
-//     }
-// }
+pub struct Collateral {
+    pub(crate) crl: Crl,
+    pub(crate) qe_identity: EnclaveIdentity,
+    pub(crate) tcb_info: TcbInfo,
+}

@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
-use der::Encode;
 use der::oid::db::rfc5912::ECDSA_WITH_SHA_256;
+use der::{Decode, Encode};
 use p256::ecdsa::Signature;
 use signature::Verifier;
 use x509_cert::der::DecodePem;
@@ -27,7 +27,22 @@ impl Crl {
         verifier: impl Verifier<Signature>,
         pem: impl AsRef<[u8]>,
     ) -> Result<Self, CertificateError> {
-        let list: CertificateList<Rfc5280> = CertificateList::from_pem(pem)?;
+        let list = CertificateList::from_pem(pem)?;
+        Self::from_certificate_list(verifier, list)
+    }
+    pub fn from_der(
+        verifier: impl Verifier<Signature>,
+        der: impl AsRef<[u8]>,
+    ) -> Result<Self, CertificateError> {
+        let list = CertificateList::from_der(der.as_ref())?;
+        Self::from_certificate_list(verifier, list)
+    }
+
+    pub fn from_certificate_list(
+        verifier: impl Verifier<Signature>,
+        list: CertificateList,
+    ) -> Result<Self, CertificateError> {
+        // let list: CertificateList<Rfc5280> = CertificateList::from_pem(pem)?;
 
         // verify validity of crl
         let expired = list

@@ -1,4 +1,4 @@
-use tdx_attest::{Quote, dcap::parser::ParseErrorExt, pcs::Pcs};
+use tdx_attest::{Quote, dcap::parser::ParseErrorExt, pcs::Pcs, verify};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,18 +23,20 @@ async fn main() -> anyhow::Result<()> {
     // let fmspc = quote.certification().sgx_extensions()?.fmspc().unwrap();
     // dbg!(fmspc);
 
-    let fmspc = quote
-        .certification()
-        .sgx_extensions()?
-        .fmspc()
-        .context("context")?;
+    // let fmspc = quote
+    //     .certification()
+    //     .sgx_extensions()?
+    //     .fmspc()
+    //     .context("context")?;
 
     let pcs = Pcs::new("https://pccs.phala.network")?;
-    let tcb = pcs.fetch_tcb_info(fmspc).await?;
+    // let tcb = pcs.fetch_tcb_info(fmspc).await?;
 
-    pcs.fetch_crl(tdx_attest::certificates::IntermediateCa::Platform)
-        .await?;
+    let collateral = pcs.fetch_collateral(&quote).await?;
 
+    verify::verify(&quote, &collateral)?;
+
+    println!("Verification success");
     // println!("{identity:?}");
 
     Ok(())

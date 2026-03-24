@@ -10,11 +10,15 @@ pub struct EnclaveIdentity {
     pub issue_date: String,
     pub next_update: String,
     pub tcb_evaluation_data_number: u32,
-    pub miscselect: String,
-    pub miscselect_mask: String,
+    #[serde(with = "hex::serde")]
+    pub miscselect: [u8; 4],
+    #[serde(with = "hex::serde")]
+    pub miscselect_mask: [u8; 4],
     pub attributes: String,
-    pub attributes_mask: String,
-    pub mrsigner: String,
+    #[serde(with = "hex::serde")]
+    pub attributes_mask: [u8; 4],
+    #[serde(with = "hex::serde")]
+    pub mrsigner: [u8; 32],
     pub isvprodid: u16,
     pub tcb_levels: Vec<QeTcbLevel>,
 }

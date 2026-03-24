@@ -1,10 +1,10 @@
 use der::Decode;
 use hex::ToHex;
 use serde::Serialize;
-use zerocopy::{FromBytes, Immutable, KnownLayout, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 #[repr(transparent)]
-#[derive(FromBytes, KnownLayout, Clone, Copy, Immutable, Unaligned, Debug)]
+#[derive(FromBytes, KnownLayout, Clone, Copy, Immutable, IntoBytes, Unaligned, Debug)]
 pub struct SVN([u8; 16]);
 
 #[derive(Debug, Clone, Copy)]
@@ -23,7 +23,7 @@ impl ToString for Fmspc {
 }
 
 #[repr(C, packed)]
-#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug, Clone)]
+#[derive(FromBytes, KnownLayout, IntoBytes, Immutable, Unaligned, Debug, Clone)]
 pub struct QuoteHeader {
     pub version: u16,
     pub attestation_type: u16,
@@ -38,7 +38,7 @@ pub struct QuoteHeader {
 pub type Sha384 = [u8; 48];
 
 #[repr(C, packed)]
-#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug, Clone)]
+#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug, IntoBytes, Clone)]
 pub struct QuoteBody {
     pub tee_tcb_svn: SVN,
     pub mrseam: Sha384,
@@ -55,7 +55,7 @@ pub struct QuoteBody {
 }
 
 #[repr(C, packed)]
-#[derive(FromBytes, Immutable, KnownLayout, Unaligned, Debug, Clone)]
+#[derive(FromBytes, Immutable, KnownLayout, Unaligned, Debug, Clone, IntoBytes)]
 pub struct EnclaveReport {
     pub cpu_svn: SVN,
     pub miscselect: u32,
