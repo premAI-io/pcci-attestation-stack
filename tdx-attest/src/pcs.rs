@@ -2,6 +2,8 @@ pub mod qe;
 pub mod signed_response;
 pub mod tcb;
 
+use std::str::FromStr;
+
 use p256::ecdsa::Signature;
 use reqwest::{Client, IntoUrl, Url};
 use serde::Deserialize;
@@ -17,6 +19,10 @@ use crate::{
 
 const INTEL_PCS: &str = "https://api.trustedservices.intel.com/";
 
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct Pcs {
     base_url: Url,
     client: Client,
@@ -31,15 +37,17 @@ impl Default for Pcs {
     }
 }
 
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Pcs {
-    pub fn new(base_url: impl IntoUrl) -> Result<Self, reqwest::Error> {
-        let base_url = base_url.into_url()?;
+    #[wasm_bindgen(constructor)]
+    pub fn new(base_url: &str) -> Result<Self, TdxError> {
+        let base_url = Url::from_str(base_url)?;
         let client = Client::default();
 
         Ok(Pcs { base_url, client })
     }
 
-    pub async fn fetch_crl(&self, intermediate_ca: IntermediateCa) -> Result<Crl, TdxError> {
+    async fn fetch_crl(&self, intermediate_ca: IntermediateCa) -> Result<Crl, TdxError> {
         let mut url = self.base_url.join("/sgx/certification/v4/pckcrl").unwrap();
         url.query_pairs_mut()
             .append_pair("ca", intermediate_ca.as_str())
@@ -64,7 +72,7 @@ impl Pcs {
         Ok(crl)
     }
 
-    pub async fn fetch_qe_identity(&self) -> Result<EnclaveIdentity, TdxError> {
+    async fn fetch_qe_identity(&self) -> Result<EnclaveIdentity, TdxError> {
         let mut url = self
             .base_url
             .join("/tdx/certification/v4/qe/identity")
@@ -86,7 +94,7 @@ impl Pcs {
         Ok(identity)
     }
 
-    pub async fn fetch_tcb_info(&self, fmspc: Fmspc) -> Result<TcbInfo, TdxError> {
+    async fn fetch_tcb_info(&self, fmspc: Fmspc) -> Result<TcbInfo, TdxError> {
         let mut url = self.base_url.join("/tdx/certification/v4/tcb").unwrap();
 
         // url.quer
@@ -131,6 +139,7 @@ impl Pcs {
     }
 }
 
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct Collateral {
     pub(crate) crl: Crl,
     pub(crate) qe_identity: EnclaveIdentity,

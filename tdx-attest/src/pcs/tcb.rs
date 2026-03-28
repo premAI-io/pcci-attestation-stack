@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 use crate::dcap::types::Fmspc;
@@ -96,4 +98,20 @@ pub enum TcbStatus {
     ConfigurationNeeded,
     SWHardeningNeeded,
     UpToDate,
+}
+
+impl Display for TcbStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let display = match self {
+            Self::Revoked => "revoked",
+            Self::OutOfDate => "out of date",
+            Self::ConfigurationAndSWHardeningNeeded => "configuration and sw hardening needed",
+            Self::ConfigurationNeeded => "configuration needed",
+            Self::SWHardeningNeeded => "sw hardening needed",
+            Self::UpToDate => "up to date",
+            Self::OutOfDateConfigurationNeeded => "out of date and configuration needed",
+        };
+
+        f.write_str(display)
+    }
 }

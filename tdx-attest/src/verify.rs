@@ -13,9 +13,12 @@ use crate::{
     pcs::{
         Collateral,
         qe::QeTcbLevel,
-        tcb::{self, Tcb, TcbLevel},
+        tcb::{self, Tcb, TcbLevel, TcbStatus},
     },
 };
+
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
 
 /// Verifies:
 /// 1. QE report signature
@@ -221,11 +224,18 @@ fn verify_report_data(quote: &Quote, report_data: &TdxNonce) -> Result<(), TdxEr
     Ok(())
 }
 
-pub fn verify(
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+pub struct TcbLevels {
+    qe_tcb: QeTcbLevel,
+    isv_tcb: TcbLevel,
+}
+
+// #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+fn verify(
     quote: &Quote,
     collateral: &Collateral,
     report_data: &TdxNonce,
-) -> Result<(), TdxError> {
+) -> Result<TcbLevels, TdxError> {
     let certification = quote.certification();
 
     verify_qe_report(quote, collateral).context("error while verifying qe report")?;
@@ -237,9 +247,8 @@ pub fn verify(
 
     verify_report_data(quote, report_data).context("error while matching report data")?;
 
-    // match qe_tcb.tcb_status {}
-
-    Ok(())
+    let tcb_levels = TcbLevels { qe_tcb, isv_tcb };
+    Ok(tcb_levels)
 }
 
 fn verify_mask<const N: usize>(quote: &[u8; N], expected: &[u8; N], mask: &[u8; N]) -> bool {
@@ -251,16 +260,40 @@ fn verify_mask<const N: usize>(quote: &[u8; N], expected: &[u8; N], mask: &[u8; 
         .all(|(quote, expected, mask)| (quote & mask) == (expected & mask))
 }
 
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct QuoteVerifier {
     collateral: Collateral,
     quote: Quote,
-    minimum_tcb_level: TcbLevel,
+    minimum_tcb_level: TcbStatus,
 }
 
-// impl QuoteVerifier {
-//     pub fn new(collateral: Collateral, quote: Quote) -> Self {
-//         Self {
-//             collateral
-//         }
-//     }
-// }
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+impl QuoteVerifier {
+    #[wasm_bindgen(constructor)]
+    pub fn new(collateral: Collateral, quote: Quote) -> Self {
+        Self {
+            collateral,
+            quote,
+            minimum_tcb_level: TcbStatus::UpToDate,
+        }
+    }
+
+    pub fn verify(&self, nonce: &TdxNonce) -> Result<(), TdxError> {
+        let tcb_levels = verify(&self.quote, &self.collateral, nonce)?;
+        let minimum_tcb = &self.minimum_tcb_level;
+
+        if tcb_levels.qe_tcb.tcb_status < self.minimum_tcb_level {
+            let tcb_status = tcb_levels.qe_tcb.tcb_status;
+            return TdxError::msg("minimum qe_tcb not matched")
+                .with_context(|| format!("expected {minimum_tcb} got {tcb_status}"));
+        }
+
+        if tcb_levels.isv_tcb.tcb_status < self.minimum_tcb_level {
+            let tcb_status = tcb_levels.isv_tcb.tcb_status;
+            return TdxError::msg("minimum isv_tcb not matched")
+                .with_context(|| format!("expected {minimum_tcb} got {tcb_status}"));
+        }
+
+        Ok(())
+    }
+}

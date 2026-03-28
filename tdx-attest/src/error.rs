@@ -2,9 +2,15 @@ use std::{backtrace::Backtrace, convert::Infallible, fmt::Display};
 
 use crate::{certificates::CertificateError, dcap::parser::ParseError};
 
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
+
+#[derive(Debug)]
 pub struct TdxError {
     inner: anyhow::Error,
 }
+
+// impl std::error::Error for TdxError {}
 
 impl Display for TdxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,6 +36,7 @@ impl From<TdxError> for anyhow::Error {
     }
 }
 
+#[allow(clippy::missing_errors_doc)]
 pub trait Context<T, E> {
     fn context<C>(self, context: C) -> Result<T, TdxError>
     where
@@ -104,6 +111,12 @@ impl<T: std::error::Error + Send + Sync + 'static> From<T> for TdxError {
     }
 }
 
+#[cfg(target_family = "wasm")]
+impl From<TdxError> for JsValue {
+    fn from(value: TdxError) -> Self {
+        JsError::new(&value.inner.to_string()).into()
+    }
+}
 // #[derive(Error, Debug)]
 // pub enum Error {
 //     #[error("certificate error: {0}")]
