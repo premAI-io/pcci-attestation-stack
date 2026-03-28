@@ -29,6 +29,8 @@ fn verify_qe_report(quote: &Quote, collateral: &Collateral) -> Result<(), TdxErr
         .pck_chain()
         .context("failed extracting pck chain from tdx quote")?;
 
+    // check for certificate revocation status
+    // in pcs obtained certificate revocation list
     collateral.crl.check_revoked(pck_chain)?;
 
     // Verify that pck_chain attests the qe signature
@@ -133,11 +135,15 @@ fn verify_qe_identity_policy(
 
 fn verify_platform_tcb(quote: &Quote, collateral: &Collateral) -> Result<TcbLevel, TdxError> {
     // verify fmspc match
+    // 1. Retrieve FMSPC value from SGX PCK Certificate assigned to a given platform.
     let fmspc = quote
         .certification()
         .sgx_extensions()?
         .fmspc()
         .context("failed to get fmspc from sgx extensions")?;
+
+    // 2. Retrieve TDX TCB Info matching the FMSPC value.
+    // > collateral.tcb_info
 
     if fmspc != collateral.tcb_info.fmspc {
         return TdxError::msg("fmspc mismatch");
@@ -149,6 +155,10 @@ fn verify_platform_tcb(quote: &Quote, collateral: &Collateral) -> Result<TcbLeve
         .context("failed to get tcb from sgx extension")?;
 
     for tcb_level in &collateral.tcb_info.tcb_levels {
+        // Compare all of the SGX TCB Comp SVNs retrieved from the SGX PCK Certificate (from 01 to 16)
+        // with the corresponding values of SVNs in sgxtcbcomponents array of TCB Level.
+        // If all SGX TCB Comp SVNs in the certificate are greater or equal to the corresponding values in TCB Level, go to 3.b,
+        // otherwise move to the next item on TCB Levels list.
         let comp_svn_check = tcb_level
             .tcb
             .sgxtcbcomponents
@@ -160,20 +170,34 @@ fn verify_platform_tcb(quote: &Quote, collateral: &Collateral) -> Result<TcbLeve
             continue;
         }
 
+        // Compare PCESVN value retrieved from the SGX PCK certificate with the corresponding value in the TCB Level.
+        // If it is greater or equal to the value in TCB Level, go to 3.c, otherwise move to the next item on TCB Levels list.
         if pck_tcb.pce_svn < u32::from(tcb_level.tcb.pcesvn) {
             continue;
         }
 
+        // Compare SVNs in TEE TCB SVN array retrieved from TD Report in Quote (from index 0 to 15 if TEE TCB SVN at index 1 is set to 0,
+        // or from index 2 to 15 otherwise) with the corresponding values of SVNs in tdxtcbcomponents array of TCB Level.
+        // If all TEE TCB SVNs in the TD Report are greater or equal to the corresponding values in TCB Level,
+        // read tcbStatus assigned to this TCB level. Otherwise, move to the next item on TCB Levels list.\
         let tdxtcbcomponents = tcb_level
             .tcb
             .tdxtcbcomponents
             .as_ref()
             .context("missing tdx tcb components")?;
 
-        let comp_tee_svn_check = tdxtcbcomponents
+        let mut comp_tee_svn_check = tdxtcbcomponents
             .iter()
-            .zip(quote.body().tee_tcb_svn.into_iter())
-            .all(|(collateral, quote)| u32::from(quote) >= collateral.svn);
+            .zip(quote.body().tee_tcb_svn.into_iter());
+
+        // https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-tcb-info-v4:~:text=from%20index%200%20to%2015%20if%20TEE%20TCB%20SVN%20at%20index%201%20is%20set%20to%200%2C%20or%20from%20index%202%20to%2015%20otherwise
+        let tee_tcb_svn_1 = tdxtcbcomponents.get(1).context("missing TEE TCB SVN")?.svn;
+        if tee_tcb_svn_1 == 0 {
+            comp_tee_svn_check.by_ref().take(2).count(); // skip 2 items from the iterator if tee_tcb_svn = 0
+        }
+
+        let comp_tee_svn_check =
+            comp_tee_svn_check.all(|(collateral, quote)| u32::from(quote) >= collateral.svn);
 
         if !comp_tee_svn_check {
             continue;
@@ -210,6 +234,8 @@ pub fn verify(
 
     verify_report_data(quote, report_data).context("error while matching report data")?;
 
+    // match qe_tcb.tcb_status {}
+
     Ok(())
 }
 
@@ -222,4 +248,16 @@ fn verify_mask<const N: usize>(quote: &[u8; N], expected: &[u8; N], mask: &[u8; 
         .all(|(quote, expected, mask)| (quote & mask) == (expected & mask))
 }
 
-// fn match_tcb_level() {}
+pub struct QuoteVerifier {
+    collateral: Collateral,
+    quote: Quote,
+    minimum_tcb_level: TcbLevel,
+}
+
+// impl QuoteVerifier {
+//     pub fn new(collateral: Collateral, quote: Quote) -> Self {
+//         Self {
+//             collateral
+//         }
+//     }
+// }

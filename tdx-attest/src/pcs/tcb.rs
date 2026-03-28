@@ -87,13 +87,13 @@ pub struct TcbComponent {
     pub component_type: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, PartialOrd)]
 pub enum TcbStatus {
-    UpToDate,
-    SWHardeningNeeded,
-    ConfigurationNeeded,
-    ConfigurationAndSWHardeningNeeded,
-    OutOfDate,
-    OutOfDateConfigurationNeeded,
     Revoked,
+    OutOfDateConfigurationNeeded,
+    OutOfDate,
+    ConfigurationAndSWHardeningNeeded,
+    ConfigurationNeeded,
+    SWHardeningNeeded,
+    UpToDate,
 }
