@@ -157,12 +157,26 @@ mod test {
         // let input = std::fs::read("./examples/tdx_quote").unwrap();
         // let quote = Quote::from_bytes(&input)?;
 
-        let pcs = Pcs::new("https://pccs.phala.network")?;
+        let pcs = Pcs::new("https://pccs.prem.io")?;
 
         pcs.fetch_qe_identity()
             .await
             .context("failed fetching qe identity")?;
 
-        todo!()
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn crl() -> anyhow::Result<()> {
+        // let input = std::fs::read("./examples/tdx_quote").unwrap();
+        // let quote = Quote::from_bytes(&input)?;
+
+        let pcs = Pcs::new("https://pccs.prem.io")?;
+
+        pcs.fetch_crl(crate::certificates::IntermediateCa::Platform)
+            .await
+            .context("failed fetching crl")?;
+
+        Ok(())
     }
 }
