@@ -71,15 +71,8 @@ pub async fn get_vcek_tcb(
             get_query_tuple("ucodeSPL", tcb.microcode),
         ]);
 
-    let resp = req
-        .send()
-        .await?
-        .error_for_status()
-        .context("error returned from kds")?
-        .bytes()
-        .await?;
-
-    sev::certs::snp::Certificate::from_der(&resp).context("could not parse kds chain")
+    let resp = req.send().await?.bytes().await?;
+    Ok(sev::certs::snp::Certificate::from_der(&resp).expect("invalid vcek from AMD KDS"))
 }
 
 pub async fn get_cert_chain(generation: Generation) -> anyhow::Result<sev::certs::snp::ca::Chain> {
@@ -101,7 +94,7 @@ pub async fn get_cert_chain(generation: Generation) -> anyhow::Result<sev::certs
 
     Ok(sev::certs::snp::ca::Chain {
         ask: ask.into(),
-        ark: ark.into(),
+        ark: ark.into(), // TODO: should be embedded? they're being pulled from https so it might not matter that much
     })
 }
 
@@ -126,3 +119,21 @@ pub async fn get_crl(product_name: &str) -> Result<Vec<u8>, reqwest::Error> {
 
     Ok(resp.into())
 }
+
+// // #[cfg(feature = "")]
+// pub mod crl {
+//     use x509_parser::prelude::*;
+
+//     pub fn is_revoked(ask: &X509Certificate, crl: &CertificateRevocationList) -> bool {
+//         let ask_serial = &ask.serial;
+
+//         crl.iter_revoked_certificates()
+//             .any(|a| a.serial() == ask_serial)
+//     }
+
+//     pub fn verify(ark: &X509Certificate, crl: &CertificateRevocationList) -> anyhow::Result<bool> {
+//         let public_key = ark.public_key();
+
+//         Ok(crl.verify_signature(public_key).is_ok())
+//     }
+// }
