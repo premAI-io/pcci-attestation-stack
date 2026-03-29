@@ -12,6 +12,8 @@ pub enum PremErr {
     Request(#[from] reqwest::Error),
     #[error("error from sev attestation: ${0}")]
     Sev(#[from] snp_attest::error::AttestationError),
+    #[error("error from tdx attestation: ${0}")]
+    Tdx(tdx_attest::error::TdxError),
     #[error("error from nvidia attestation: ${0}")]
     Nvidia(#[from] nvidia_attest::error::GpuAttestationError),
 

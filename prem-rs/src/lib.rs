@@ -11,7 +11,7 @@ use reqwest::{
 };
 pub use snp_attest;
 
-use tdx_attest::nonce::TdxNonce;
+use tdx_attest::{TdxQuote, nonce::TdxNonce, pcs::Pcs, verify::QuoteVerifier};
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -178,7 +178,7 @@ impl Client {
         nonce: &SevNonce,
         query: &QueryParams,
     ) -> Result<ParsedAttestation, PremErr> {
-        let url = self.url.join("/attestation/cpu").unwrap();
+        let url = self.url.join("/attestation/sev").unwrap();
 
         let response = self
             .reqwest_client
@@ -225,23 +225,32 @@ impl Client {
         })
     }
 
-    // pub async fn request_tdx(&self, nonce: &TdxNonce, query: &QueryParams) -> Result<, PremErr> {
-    //         let url = self.url.join("/attestation/nvidia").unwrap();
+    /// Requests and parses a TDX quote
+    ///
+    /// ### Warning
+    /// This method exposes core functionality and does not perform cryptographic
+    /// or measurement checks on the attestation. If you want to perform end-to-end attestation
+    /// please refer to [`Self::attest_tdx`]
+    pub async fn request_tdx(
+        &self,
+        nonce: &TdxNonce,
+        query: &QueryParams,
+    ) -> Result<TdxQuote, PremErr> {
+        let url = self.url.join("/attestation/tdx").unwrap();
 
-    //         let response = self
-    //             .reqwest_client
-    //             .get(url)
-    //             .query(&query.0)
-    //             .query(&[("nonce", nonce.to_hex())])
-    //             .send()
-    //             .await?;
+        let response = self
+            .reqwest_client
+            .get(url)
+            .query(&query.0)
+            .query(&[("nonce", nonce.to_hex())])
+            .send()
+            .await?;
 
-    //         let headers = response.headers().clone();
-    //         let response_text = response.error_for_status()?.text().await?;
-    //         let eat_token = EATToken::parse(&response_text)?;
+        let response = response.error_for_status()?.bytes().await?;
+        let quote = TdxQuote::from_bytes(&response).map_err(PremErr::Tdx)?;
 
-    //         Ok(NvidiaAttestResult{ eat_token: eat_token, headers: ResponseHeaders(headers) })
-    //     }
+        Ok(quote)
+    }
 
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
     pub async fn attest_sev(&self, query: Option<QueryParams>) -> Result<(), PremErr> {
@@ -251,6 +260,22 @@ impl Client {
         let keychain = snp_attest::kds::fetch_certificates(&attestation).await?;
 
         attestation.verify(&keychain, &nonce)?;
+
+        // TODO: measurement verification
+
+        Ok(())
+    }
+
+    /// Performs end-to-end tdx attestation. Generates nonce and validates claims all in one
+    pub async fn attest_tdx(&self, query: Option<QueryParams>) -> Result<(), PremErr> {
+        let nonce = TdxNonce::generate();
+
+        let quote = self.request_tdx(&nonce, &query.unwrap_or_default()).await?;
+        let pcs = Pcs::new("https://pccs.prem.io/").unwrap();
+        let collateral = pcs.fetch_collateral(&quote).await.map_err(PremErr::Tdx)?;
+
+        let verifier = QuoteVerifier::new(collateral, quote);
+        verifier.verify(&nonce).map_err(PremErr::Tdx)?;
 
         // TODO: measurement verification
 
@@ -285,7 +310,7 @@ impl Client {
 
         match modules.cpu() {
             CpuModule::Sev => self.attest_sev(query.clone()).await?,
-            _ => unimplemented!(),
+            CpuModule::Tdx => self.attest_tdx(query.clone()).await?,
         }
 
         let gpu_headers = match modules.gpu() {

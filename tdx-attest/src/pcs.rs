@@ -39,7 +39,7 @@ impl Default for Pcs {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Pcs {
-    #[wasm_bindgen(constructor)]
+    #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
     pub fn new(base_url: &str) -> Result<Self, TdxError> {
         let base_url = Url::from_str(base_url)?;
         let client = Client::default();

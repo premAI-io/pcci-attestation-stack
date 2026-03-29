@@ -18,7 +18,7 @@ impl Deref for TdxNonce {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl TdxNonce {
-    #[wasm_bindgen(constructor)]
+    #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
     pub fn generate() -> Self {
         Self(libattest::ByteNonce::generate())
     }

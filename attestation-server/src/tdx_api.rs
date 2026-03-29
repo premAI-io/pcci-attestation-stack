@@ -2,7 +2,7 @@ use anyhow::Context;
 
 use crate::{nonce::NonceParam, response::ApiError};
 
-#[rocket::get("/cpu?<nonce>")]
+#[rocket::get("/tdx?<nonce>")]
 pub async fn tdx_attestation(
     nonce: NonceParam<libattest::ByteNonce<64>, 64>,
 ) -> Result<Vec<u8>, ApiError> {

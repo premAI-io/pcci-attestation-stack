@@ -269,7 +269,7 @@ pub struct QuoteVerifier {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl QuoteVerifier {
-    #[wasm_bindgen(constructor)]
+    #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
     pub fn new(collateral: Collateral, quote: TdxQuote) -> Self {
         Self {
             collateral,
