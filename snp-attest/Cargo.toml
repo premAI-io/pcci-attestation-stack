@@ -14,7 +14,7 @@ serde_json = "1.0"
 # openssl = { version = "0.10.73" }
 x509-parser = { version="0.18.0", features=["verify"] }
 hex = {version = "0.4.3"}
-reqwest = { optional = true, version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 thiserror = "2"
 p384 = "0.13.1"
 rsa = "0.9.8"
@@ -24,6 +24,7 @@ der = { version = "0.7.10", features = ["pem"] }
 signature = { version = "2.2.0", features = ["std"] }
 clap = { version = "4.5.53", optional = true, features = ["derive"] }
 log = "0.4.28"
+url = "2.5.8"
 
 [dependencies.getrandom]
 version = "=0.2.16"
@@ -35,10 +36,9 @@ wasm-bindgen-futures = "0.4.55"
 wasm-log = { version = "0.3.1", optional = true }
 
 [features]
-default = ["attestation", "kds", "serde"]
+default = ["attestation", "serde"]
 logger = ["dep:wasm-log"]
 hyperv = ["dep:tss-esapi"]
 serde = ["sev/serde"]
-kds = ["dep:reqwest"]
 attestation = []
 bin = ["dep:clap"]

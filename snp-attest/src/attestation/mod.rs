@@ -5,14 +5,12 @@ pub mod error;
 /// Methods for interacting with AMD's keyserver
 pub mod kds;
 
-use crate::kds_util::chipid_from_gen;
-
 // pub mod nonce;
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
-use crate::{nonce::SevNonce, oid};
+use crate::{kds::chipid_from_gen, nonce::SevNonce, oid};
 use der::Encode;
 use sev::{
     CpuFamily, CpuModel, Generation, firmware::guest::AttestationReport, parser::ByteParser,
@@ -87,15 +85,15 @@ impl ParsedAttestation {
         if let Some(hwid) = exts_map.get(&oid::HWID) {
             oid::compare_bytes(
                 hwid,
-                chipid_from_gen(&self.report.chip_id, self.generation()))
-                .then_some(())
-                .ok_or(VerificationReason::ChipId)?;
+                chipid_from_gen(&self.report.chip_id, self.generation()),
+            )
+            .then_some(())
+            .ok_or(VerificationReason::ChipId)?;
         }
 
         let product_name_ext = exts_map.get(&oid::PRODUCT_NAME).unwrap();
-        let (product_name, _) =
-            crate::kds_util::decode_product_name(product_name_ext.value.to_vec())
-                .map_err(|_| ParseReason::DecodeProductName)?;
+        let (product_name, _) = kds::decode_product_name(product_name_ext.value.to_vec())
+            .map_err(|_| ParseReason::DecodeProductName)?;
 
         if product_name != self.generation.titlecase() {
             Err(VerificationReason::BadProductName)?;

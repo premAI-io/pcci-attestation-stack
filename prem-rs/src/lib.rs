@@ -2,7 +2,7 @@ pub mod error;
 
 use libattest::{CpuModule, GpuModule, Modules};
 use nvidia_attest::{EATToken, keychain::KeyChain, nonce::NvidiaNonce};
-use snp_attest::{ParsedAttestation, nonce::SevNonce};
+use snp_attest::{ParsedAttestation, kds::Kds, nonce::SevNonce};
 
 pub use nvidia_attest;
 use reqwest::{
@@ -106,9 +106,17 @@ impl Default for QueryParams {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct ClientBuilder {
+    /// base url for PREM attestation server
     url: String,
+    /// intel collateral server
+    pcs: Pcs,
+    // amd collateral server
+    kds: Kds,
     headers: HeaderMap,
 }
+
+const PREM_PCCS: &str = "https://pccs.prem.io/";
+const PREM_KCDS: &str = "https://kcds.prem.io";
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl ClientBuilder {
@@ -116,6 +124,8 @@ impl ClientBuilder {
     pub fn new(url: &str) -> Self {
         Self {
             url: url.to_string(),
+            pcs: Pcs::new(PREM_PCCS).unwrap(),
+            kds: Kds::new(PREM_KCDS).unwrap(),
             headers: HeaderMap::default(),
         }
     }
@@ -128,6 +138,18 @@ impl ClientBuilder {
         Ok(self)
     }
 
+    /// Sets custom KDS for AMD collateral server
+    pub fn with_kds(mut self, kds: Kds) -> Self {
+        self.kds = kds;
+        self
+    }
+
+    /// Sets custom PCS for Intel collateral server
+    pub fn with_pcs(mut self, pcs: Pcs) -> Self {
+        self.pcs = pcs;
+        self
+    }
+
     pub fn build(self) -> Result<Client, PremErr> {
         let reqwest_client = reqwest::Client::builder()
             .default_headers(self.headers)
@@ -135,6 +157,8 @@ impl ClientBuilder {
 
         Ok(Client {
             url: self.url.parse().map_err(PremErr::Parse)?,
+            kds: self.kds,
+            pcs: self.pcs,
             reqwest_client,
         })
     }
@@ -143,6 +167,8 @@ impl ClientBuilder {
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct Client {
     url: Url,
+    kds: Kds,
+    pcs: Pcs,
     reqwest_client: reqwest::Client,
 }
 
@@ -220,7 +246,7 @@ impl Client {
         let eat_token = EATToken::parse(&response_text)?;
 
         Ok(NvidiaAttestResult {
-            eat_token: eat_token,
+            eat_token,
             headers: ResponseHeaders(headers),
         })
     }
@@ -257,7 +283,8 @@ impl Client {
         let nonce = SevNonce::generate();
 
         let attestation = self.request_sev(&nonce, &query.unwrap_or_default()).await?;
-        let keychain = snp_attest::kds::fetch_certificates(&attestation).await?;
+
+        let keychain = self.kds.fetch_certificates(&attestation).await?;
 
         attestation.verify(&keychain, &nonce)?;
 
@@ -271,8 +298,11 @@ impl Client {
         let nonce = TdxNonce::generate();
 
         let quote = self.request_tdx(&nonce, &query.unwrap_or_default()).await?;
-        let pcs = Pcs::new("https://pccs.prem.io/").unwrap();
-        let collateral = pcs.fetch_collateral(&quote).await.map_err(PremErr::Tdx)?;
+        let collateral = self
+            .pcs
+            .fetch_collateral(&quote)
+            .await
+            .map_err(PremErr::Tdx)?;
 
         let verifier = QuoteVerifier::new(collateral, quote);
         verifier.verify(&nonce).map_err(PremErr::Tdx)?;

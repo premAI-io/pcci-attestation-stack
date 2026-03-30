@@ -3183,6 +3183,7 @@ dependencies = [
  "signature",
  "thiserror 2.0.18",
  "tss-esapi",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-log",

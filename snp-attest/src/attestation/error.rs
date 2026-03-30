@@ -41,6 +41,8 @@ pub enum AttestationError {
     Verification(#[from] VerificationReason),
     #[error("unable to get certificates from KDS keychain")]
     KdsRequest,
+    #[error("error parsing supplied url: {0}")]
+    UrlParse(#[from] url::ParseError),
     #[error("a pem signature was invalid")]
     Signature,
     #[error("mismatched nonce between attestation and user provided data")]
