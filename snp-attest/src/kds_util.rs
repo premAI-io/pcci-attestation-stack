@@ -59,18 +59,24 @@ pub async fn get_vcek_tcb(
     generation: Generation,
 ) -> anyhow::Result<sev::certs::snp::Certificate> {
     let client = Client::new();
+    let mut query = vec![
+        get_query_tuple("blSPL", tcb.bootloader),
+        get_query_tuple("teeSPL", tcb.tee),
+        get_query_tuple("snpSPL", tcb.snp),
+        get_query_tuple("ucodeSPL", tcb.microcode),
+    ];
+
+    if let Some(fmc) = tcb.fmc {
+        query.push(get_query_tuple("fmcSPL", fmc));
+    }
+
     let req = client
         .get(format!(
             "{}/{}",
             get_base_url(generation.titlecase()),
             encode_hw_id(chip_id, generation)
         ))
-        .query(&[
-            get_query_tuple("blSPL", tcb.bootloader),
-            get_query_tuple("teeSPL", tcb.tee),
-            get_query_tuple("snpSPL", tcb.snp),
-            get_query_tuple("ucodeSPL", tcb.microcode),
-        ]);
+        .query(&query);
 
     let resp = req.send().await?.bytes().await?;
     Ok(sev::certs::snp::Certificate::from_der(&resp).expect("invalid vcek from AMD KDS"))
