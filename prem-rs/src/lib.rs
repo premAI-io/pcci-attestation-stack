@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 use crate::error::PremErr;
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AttestHeaders {
     cpu: Option<ResponseHeaders>,
     gpu: Option<ResponseHeaders>,
@@ -36,7 +36,7 @@ impl AttestHeaders {
 }
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AttestResult {
     modules: Modules,
     headers: AttestHeaders,
@@ -53,7 +53,7 @@ impl AttestResult {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct ResponseHeaders(HeaderMap);
 
