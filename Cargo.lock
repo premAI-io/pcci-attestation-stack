@@ -3168,7 +3168,6 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 name = "snp-attest"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
  "der 0.7.10",
  "getrandom 0.2.16",

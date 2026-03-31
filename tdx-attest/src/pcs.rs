@@ -4,6 +4,7 @@ pub mod tcb;
 
 use std::str::FromStr;
 
+use libattest::error::Context;
 use p256::ecdsa::Signature;
 use reqwest::{Client, IntoUrl, Url};
 use serde::Deserialize;
@@ -13,7 +14,7 @@ use crate::{
     TdxQuote,
     certificates::{CertificateChain, IntermediateCa, ca::INTEL_CA, crl::Crl},
     dcap::types::Fmspc,
-    error::{Context, TdxError},
+    error::TdxError,
     pcs::{qe::EnclaveIdentity, signed_response::ParseSignedResponse, tcb::TcbInfo},
 };
 

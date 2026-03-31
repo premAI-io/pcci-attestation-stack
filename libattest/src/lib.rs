@@ -5,16 +5,12 @@ pub mod verification;
 pub use modules::*;
 pub use verification::*;
 
-//#[cfg(target_family = "wasm")]
-//use wasm_bindgen::prelude::*;
+pub type Result<T> = std::result::Result<T, error::AttestationError>;
 
-// #[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ByteNonce<const N: usize>(Box<[u8; N]>);
 
-// #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl<const N: usize> ByteNonce<N> {
-    // #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
     pub fn generate() -> Self {
         let mut bytes = Box::new([0u8; N]);
 

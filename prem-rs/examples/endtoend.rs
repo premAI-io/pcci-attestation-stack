@@ -25,5 +25,5 @@ async fn main() {
     // parsed.validate(&nonce).unwrap();
 
     let result = client.attest(None).await.unwrap();
-    dbg!(result);
+    // println!("{result}");
 }

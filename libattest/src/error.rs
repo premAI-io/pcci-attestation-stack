@@ -1,32 +1,43 @@
-use std::{convert::Infallible, fmt::Display};
+use std::{borrow::Cow, convert::Infallible, fmt::Display};
 
-use wasm_bindgen::JsValue;
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
 
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
     #[default]
     Internal,
-    Exposed,
+    Exposed(Vec<String>),
 }
 
 // #[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[derive(Debug)]
 pub struct AttestationError {
     kind: ErrorKind,
     error: anyhow::Error,
 }
 
+fn format_exposed<'a>(errors: impl IntoIterator<Item = String>) -> String {
+    errors
+        .into_iter()
+        .enumerate()
+        .map(|(n, err)| if n == 0 { err } else { format!(" → {err}") })
+        .collect()
+}
+
+#[cfg(target_family = "wasm")]
 impl From<AttestationError> for JsValue {
     fn from(value: AttestationError) -> Self {
         let cause: String = value
             .error
             .chain()
             .enumerate()
-            .map(|(n, cause)| format!("{n}: {cause}::\n"))
+            .map(|(n, cause)| format!("[{n}]: {cause}, "))
             .collect();
 
         let error_message = match value.kind {
             ErrorKind::Internal => "Unhandled error",
-            ErrorKind::Exposed => &format!("{}", value.error),
+            ErrorKind::Exposed(exposed) => &format_exposed(exposed),
         };
 
         let error = js_sys::Error::new(error_message);
@@ -50,11 +61,19 @@ impl AttestationError {
         })
     }
 
+    /// Exposes the last error in the chain for the user to
+    /// see. If called multiple times, the exposed errors will be chained
     pub fn exposed<T>(message: &'static str) -> Result<T, Self> {
-        Err(Self {
-            kind: ErrorKind::Exposed,
-            error: anyhow::Error::msg(message),
-        })
+        Self::internal(message).expose_error()
+    }
+
+    pub fn expose(mut self) -> Self {
+        let last_message = self.error.to_string();
+        match self.kind {
+            ErrorKind::Internal => self.kind = ErrorKind::Exposed(vec![last_message]),
+            ErrorKind::Exposed(ref mut exposed) => exposed.push(last_message),
+        }
+        self
     }
 
     fn from_anyhow(error: anyhow::Error) -> Self {
@@ -146,5 +165,17 @@ impl<T: std::error::Error + Send + Sync + 'static> From<T> for AttestationError 
             kind: ErrorKind::Internal,
             error: value.into(),
         }
+    }
+}
+
+pub trait Expose {
+    /// Exposes the last error in the chain for the user to
+    /// see. If called multiple times, the exposed errors will be chained
+    fn expose_error(self) -> Self;
+}
+
+impl<T> Expose for Result<T, AttestationError> {
+    fn expose_error(self) -> Self {
+        self.map_err(AttestationError::expose)
     }
 }
