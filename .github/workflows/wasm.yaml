@@ -201,8 +201,7 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
-
+                  node-version: "24"
             - name: fix package.json
               run: mv prem-rs/pkg/package.json prem-rs/pkg/package.json.tmpl 
             - name: Publish npm package (gh)
@@ -211,6 +210,7 @@ jobs:
                 #!/bin/sh -e
 
                 cd prem-rs/pkg
+                rm .npmrc || true
                 npm config set @prem-research:registry https://npm.pkg.github.com -L project
                 echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc 
                 jq --arg name "@prem-research/`jq -r '.name' package.json.tmpl`" '.name = $name' package.json.tmpl > package.json
@@ -223,6 +223,7 @@ jobs:
                 #!/bin/sh -e
 
                 cd prem-rs/pkg
+                rm .npmrc || true
                 npm config set @premai:registry https://registry.npmjs.org -L project
                 jq --arg name "@premai/`jq -r '.name' package.json.tmpl`" '.name = $name' package.json.tmpl > package.json
                 npm publish --access public
