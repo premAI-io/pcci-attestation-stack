@@ -1,7 +1,18 @@
-use std::{borrow::Cow, convert::Infallible, fmt::Display};
+use std::{convert::Infallible, fmt::Display};
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
+
+#[macro_export]
+macro_rules! bail {
+    ($msg:expr) => {
+        return libattest::error::AttestationError::internal($msg);
+    };
+
+    (exposed: $msg:expr) => {
+        return libattest::error::AttestationError::exposed($msg);
+    };
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
@@ -17,7 +28,7 @@ pub struct AttestationError {
     error: anyhow::Error,
 }
 
-fn format_exposed<'a>(errors: impl IntoIterator<Item = String>) -> String {
+fn format_exposed(errors: impl IntoIterator<Item = String>) -> String {
     errors
         .into_iter()
         .enumerate()

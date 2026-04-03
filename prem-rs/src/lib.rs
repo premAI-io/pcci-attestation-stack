@@ -331,9 +331,10 @@ impl Client {
         let attest_result = self
             .request_nvidia(&nonce, &query.unwrap_or_default())
             .await?;
-        let claims = attest_result.eat_token.verify(&keychain)?;
 
-        claims.validate(&nonce)?;
+        attest_result.eat_token.verify(&keychain, &nonce)?;
+
+        // claims.validate(&nonce)?;
 
         Ok(attest_result.headers)
     }
