@@ -149,7 +149,8 @@ pub struct Collateral {
 
 #[cfg(test)]
 mod test {
-    use crate::{error::Context, pcs::Pcs};
+    use crate::pcs::Pcs;
+    use libattest::error::Context;
 
     const QUOTE: &[u8] = include_bytes!("../tests/tdx_quote");
 
