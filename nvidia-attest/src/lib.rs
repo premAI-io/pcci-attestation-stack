@@ -31,12 +31,6 @@ pub struct DecodedClaims {
     gpu_claims: HashMap<String, GpuClaims>,
 }
 
-impl AssignedPolicy for DecodedClaims {
-    fn policy(&self) -> std::borrow::Cow<'static, str> {
-        "nvidia.allow".into()
-    }
-}
-
 #[derive(PartialEq, Debug)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
 pub struct EATToken {

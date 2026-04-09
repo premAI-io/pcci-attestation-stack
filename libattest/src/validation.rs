@@ -7,7 +7,7 @@ use crate::error::{AttestationError, Context};
 
 pub trait Claim: AssignedPolicy {
     /// Converts this set of claims into a rego engine compatible format
-    fn rego(&self) -> Result<regorus::Value, AttestationError>;
+    fn rego_repr(&self) -> impl Serialize;
 }
 
 pub trait AssignedPolicy {
@@ -21,24 +21,29 @@ pub trait AssignedPolicy {
     fn policy(&self) -> Cow<'static, str>;
 }
 
-pub struct SerdeClaims<S>(pub S)
-where
-    S: Serialize + AssignedPolicy;
+pub struct WithPolicy<T: Serialize> {
+    claims: T,
+    policy: Cow<'static, str>,
+}
 
-impl<S> Claim for SerdeClaims<S>
-where
-    S: Serialize + AssignedPolicy,
-{
-    fn rego(&self) -> Result<regorus::Value, AttestationError> {
-        let value = serde_value::to_value(&self.0)?;
-        let rego = regorus::Value::deserialize(value)?;
-        Ok(rego)
+impl<T: Serialize> WithPolicy<T> {
+    pub fn new(policy: impl Into<Cow<'static, str>>, claims: T) -> Self {
+        Self {
+            claims,
+            policy: policy.into(),
+        }
     }
 }
 
-impl<S: Serialize + AssignedPolicy> AssignedPolicy for SerdeClaims<S> {
+impl<T: Serialize> Claim for WithPolicy<T> {
+    fn rego_repr(&self) -> impl Serialize {
+        &self.claims
+    }
+}
+
+impl<T: Serialize> AssignedPolicy for WithPolicy<T> {
     fn policy(&self) -> Cow<'static, str> {
-        self.0.policy()
+        self.policy.clone()
     }
 }
 
@@ -119,12 +124,10 @@ impl Validator {
         let mut engine = self.engine.clone();
 
         // convert claims to rego compatible format
-        let claims_value = claims
-            .rego()
-            .context("failed converting claims into rego compatible format")?;
-
+        let value = serde_value::to_value(claims.rego_repr())?;
+        let value = regorus::Value::deserialize(value)?;
         // here we set what input. will be in rego
-        engine.set_input(claims_value);
+        engine.set_input(value);
 
         let query = format!("data.{}", claims.policy());
         let result = engine

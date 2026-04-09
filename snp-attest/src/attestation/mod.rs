@@ -5,7 +5,11 @@ pub mod kds;
 
 // pub mod nonce;
 
-use libattest::error::{AttestationError, Context, Expose};
+use libattest::{
+    error::{AttestationError, Context, Expose},
+    validation::{AssignedPolicy, Claim, WithPolicy},
+};
+use serde::{Deserialize, Serialize};
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 

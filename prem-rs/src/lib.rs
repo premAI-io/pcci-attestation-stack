@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use libattest::{
     CpuModule, GpuModule, Modules,
     error::{AttestationError, Context, Expose},
-    validation::{SerdeClaims, Validator},
+    validation::{Validator, WithPolicy},
 };
 use nvidia_attest::{EATToken, keychain::KeyChain, nonce::NvidiaNonce};
 use snp_attest::{ParsedAttestation, kds::Kds, nonce::SevNonce};
@@ -312,14 +312,18 @@ impl Client {
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
     pub async fn attest_sev(&self, query: Option<QueryParams>) -> Result<(), AttestationError> {
         let nonce = SevNonce::generate();
-
         let attestation = self.request_sev(&nonce, &query.unwrap_or_default()).await?;
-
         let keychain = self.kds.fetch_certificates(&attestation).await?;
 
         attestation.verify(&keychain, &nonce)?;
 
-        // TODO: measurement verification
+        let report = attestation.report();
+        let claims = WithPolicy::new("sev.allow", report);
+
+        self.policy_validator
+            .verify_claim(claims)?
+            .or_err("sev claims did not match specified OPA policy")
+            .expose_error()?;
 
         Ok(())
     }
@@ -336,13 +340,19 @@ impl Client {
             .context("failed fetching collateral from pcs server")
             .expose_error()?;
 
+        let claims = quote.body().clone();
+
         let verifier = QuoteVerifier::new(collateral, quote);
         verifier
             .verify(&nonce)
             .context("TDX quote verification has failed")
             .expose_error()?;
 
-        // TODO: measurement verification
+        let claims = WithPolicy::new("tdx.allow", claims);
+        self.policy_validator
+            .verify_claim(claims)?
+            .or_err("tdx claims did not match specified OPA policy")
+            .expose_error()?;
 
         Ok(())
     }
@@ -360,7 +370,7 @@ impl Client {
             .await?;
 
         let claims = attest_result.eat_token.verify(&keychain, &nonce)?;
-        let claims = SerdeClaims(claims);
+        let claims = WithPolicy::new("nvidia.allow", claims);
 
         self.policy_validator
             .verify_claim(claims)?
