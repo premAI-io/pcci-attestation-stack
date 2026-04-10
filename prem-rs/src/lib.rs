@@ -317,11 +317,8 @@ impl Client {
 
         attestation.verify(&keychain, &nonce)?;
 
-        let report = attestation.report();
-        let claims = WithPolicy::new("sev.allow", report);
-
         self.policy_validator
-            .verify_claim(claims)?
+            .verify_claim(&attestation)?
             .or_err("sev claims did not match specified OPA policy")
             .expose_error()?;
 

@@ -1,4 +1,4 @@
-use libattest::error::{AttestationError, Context};
+use libattest::error::{AttestationError};
 use reqwest::{Client, Url};
 use sev::{Generation, firmware::host::TcbVersion};
 use x509_cert::certificate::{CertificateInner, Rfc5280};

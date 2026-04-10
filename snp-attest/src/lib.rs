@@ -1,3 +1,4 @@
+pub mod claims;
 pub mod nonce;
 pub mod oid;
 

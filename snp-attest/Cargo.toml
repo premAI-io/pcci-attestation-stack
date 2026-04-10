@@ -10,10 +10,10 @@ libattest = { path = "../libattest" }
 tss-esapi = { version= "7.2", optional=true }
 # anyhow = "1.0.69"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0" }
 # openssl = { version = "0.10.73" }
 x509-parser = { version="0.18.0", features=["verify"] }
-hex = {version = "0.4.3"}
+hex = { version = "0.4.3", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 thiserror = "2"
 p384 = "0.13.1"
