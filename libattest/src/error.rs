@@ -1,7 +1,18 @@
-use std::{borrow::Cow, convert::Infallible, fmt::Display};
+use std::{convert::Infallible, fmt::Display};
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
+
+#[macro_export]
+macro_rules! bail {
+    ($msg:expr) => {
+        return libattest::error::AttestationError::internal($msg);
+    };
+
+    (exposed: $msg:expr) => {
+        return libattest::error::AttestationError::exposed($msg);
+    };
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
@@ -17,7 +28,7 @@ pub struct AttestationError {
     error: anyhow::Error,
 }
 
-fn format_exposed<'a>(errors: impl IntoIterator<Item = String>) -> String {
+fn format_exposed(errors: impl IntoIterator<Item = String>) -> String {
     errors
         .into_iter()
         .enumerate()
@@ -49,7 +60,10 @@ impl From<AttestationError> for JsValue {
 
 impl Display for AttestationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.error.fmt(f)
+        match self.kind {
+            ErrorKind::Internal => self.error.fmt(f),
+            ErrorKind::Exposed(ref exp) => f.write_str(&format_exposed(exp.iter().cloned())),
+        }
     }
 }
 
@@ -76,7 +90,7 @@ impl AttestationError {
         self
     }
 
-    fn from_anyhow(error: anyhow::Error) -> Self {
+    pub(crate) fn from_anyhow(error: anyhow::Error) -> Self {
         AttestationError {
             error,
             kind: ErrorKind::Internal,

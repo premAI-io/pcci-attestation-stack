@@ -1,13 +1,15 @@
-pub mod error;
 pub mod keychain;
 pub mod nonce;
 pub mod types;
-pub mod verifiers;
 
 use std::{collections::HashMap, ops::Deref};
 
 use jsonwebtoken::{DecodingKey, Validation};
-use libattest::{AddRule, VerificationBuilder};
+use libattest::{
+    bail,
+    error::{AttestationError, Context, Expose},
+    // validation::AssignedPolicy,
+};
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -16,11 +18,9 @@ use sha2::{Digest, Sha256};
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    error::GpuAttestationError,
     keychain::KeyChain,
     nonce::NvidiaNonce,
     types::{GpuClaims, OverallClaims},
-    verifiers::{CheckValidator, NonceValidator},
 };
 
 #[derive(Debug)]
@@ -29,27 +29,6 @@ use crate::{
 pub struct DecodedClaims {
     overall_claims: OverallClaims,
     gpu_claims: HashMap<String, GpuClaims>,
-}
-
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
-impl DecodedClaims {
-    pub fn validate(&self, nonce: &NvidiaNonce) -> Result<(), GpuAttestationError> {
-        // validate gpu claims
-        let gpu_validator = VerificationBuilder::new()
-            .add_rule(CheckValidator)
-            .add_rule(NonceValidator::from(nonce));
-
-        gpu_validator.verify_all(self.gpu_claims.values())?;
-
-        // validate overall claims
-        let overall_validator = VerificationBuilder::new()
-            .add_rule(CheckValidator)
-            .add_rule(NonceValidator::from(nonce));
-
-        overall_validator.verify(&self.overall_claims)?;
-
-        Ok(())
-    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -61,37 +40,37 @@ pub struct EATToken {
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl EATToken {
-    pub fn parse(from: &str) -> Result<Self, GpuAttestationError> {
+    pub fn parse(from: &str) -> Result<Self, AttestationError> {
         let [overall, gpu]: [serde_json::Value; 2] = serde_json::from_str(from)?;
 
         let overall = match overall.as_array().map(|val| val.deref()) {
             Some([_, Value::String(overall)]) => overall.clone(),
-            _ => return Err(GpuAttestationError::Parse("wrong overall jwt format")),
+            _ => bail!("wrong overall attestation format"),
         };
 
         let gpu: HashMap<String, String> = gpu
             .as_object()
-            .ok_or(GpuAttestationError::Parse(
-                "gpu claims are wrongly formatted",
-            ))?
+            .context("gpu claims are wrongly formatted")?
             .iter()
             .map(element_as_string)
             .collect::<Option<_>>()
-            .ok_or(GpuAttestationError::Parse(
-                "gpu claims should be jwt strings",
-            ))?;
+            .context("gpu claims should be jwt strings")?;
 
         Ok(Self { overall, gpu })
     }
 
-    pub fn verify(self, keys: &KeyChain) -> Result<DecodedClaims, GpuAttestationError> {
+    pub fn verify(
+        self,
+        keys: &KeyChain,
+        nonce: &NvidiaNonce,
+    ) -> Result<DecodedClaims, AttestationError> {
         // decoding the header beforehand is necessary to gain the kid
         let jwt_header = jsonwebtoken::decode_header(&self.overall)?;
 
         let key = jwt_header
             .kid
-            .ok_or(GpuAttestationError::Parse("missing kid from jwt header"))
-            .and_then(|kid| keys.find(&kid).ok_or(GpuAttestationError::MissingKey))?;
+            .context("missing field kid from jwt headers")
+            .and_then(|kid| keys.find(&kid).context("missing key from jwks"))?;
 
         let key = DecodingKey::from_jwk(key)?;
 
@@ -112,12 +91,14 @@ impl EATToken {
 
         // do hashed jwts match with overall claims?
         for (gpu, digest) in &overall_claims.submods {
-            let hash = gpu_hashes.get(gpu.deref()).ok_or(GpuAttestationError::Verification("overall jwt claims require a submodule that was not found in the detached claims"))?;
+            let hash = gpu_hashes.get(gpu.deref()).context(
+                "overall jwt claims require a submodule that was not found in the detached claims",
+            ).expose_error()?;
 
             if hash.deref() != digest.digest() {
-                return Err(GpuAttestationError::Verification(
+                return AttestationError::exposed(
                     "digest mismatch between submodule claims and detached submodules",
-                ));
+                );
             }
         }
 
@@ -127,15 +108,28 @@ impl EATToken {
             let header = jsonwebtoken::decode_header(&gpu_jwt)?;
             let key = header
                 .kid
-                .ok_or(GpuAttestationError::Parse("missing kid from gpu claim"))
-                .and_then(|kid| keys.find(&kid).ok_or(GpuAttestationError::MissingKey))?;
+                .context("missing field kid from jwt headers")
+                .and_then(|kid| keys.find(&kid).context("jwk server does not have our key"))?;
 
             let key = DecodingKey::from_jwk(key)?;
 
             let decoded =
-                jsonwebtoken::decode::<GpuClaims>(&gpu_jwt, &key, &Validation::new(header.alg))?;
+                jsonwebtoken::decode::<GpuClaims>(&gpu_jwt, &key, &Validation::new(header.alg))
+                    .context("gpu module signature error")?;
 
             gpu_claims.insert(gpu, decoded.claims);
+        }
+
+        // nonce checking
+        if overall_claims.eat_nonce != nonce.as_ref() {
+            bail!(exposed: "mismatched nvidia nonce");
+        }
+
+        if !gpu_claims
+            .iter()
+            .all(|(_, claim)| claim.eat_nonce == nonce.as_ref())
+        {
+            bail!(exposed: "mismatched nvidia nonce in one or more gpu modules");
         }
 
         Ok(DecodedClaims {

@@ -41,12 +41,14 @@ pub struct TdxQuoteHeader {
     pub user_data: [u8; 20],
 }
 
-pub type Sha384 = [u8; 48];
+#[derive(Serialize, Debug, FromBytes, Immutable, KnownLayout, IntoBytes, Clone, Copy)]
+#[repr(transparent)]
+pub struct Sha384(#[serde(with = "hex::serde")] [u8; 48]);
 
 pub type ReportData = [u8; 64];
 
 #[repr(C, packed)]
-#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug, IntoBytes, Clone)]
+#[derive(FromBytes, KnownLayout, Immutable, Unaligned, Debug, IntoBytes, Clone, Serialize)]
 pub struct TdxQuoteBody {
     pub tee_tcb_svn: SVNs,
     pub mrseam: Sha384,
@@ -55,10 +57,14 @@ pub struct TdxQuoteBody {
     pub tdattributes: [u8; 8],
     pub xfam: [u8; 8],
     pub mrtd: Sha384,
+    #[serde(with = "hex::serde")]
     pub mrconfigid: [u8; 48],
+    #[serde(with = "hex::serde")]
     pub mrowner: [u8; 48],
+    #[serde(with = "hex::serde")]
     pub mrownerconfig: [u8; 48],
     pub rtmr: [Sha384; 4],
+    #[serde(with = "hex::serde")]
     pub report_data: ReportData,
 }
 
