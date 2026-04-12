@@ -39,12 +39,12 @@ fn format_exposed(errors: impl IntoIterator<Item = String>) -> String {
 #[cfg(target_family = "wasm")]
 impl From<AttestationError> for JsValue {
     fn from(value: AttestationError) -> Self {
-        let cause: String = value
+        let cause: String = itertools::Itertools::join(&mut value
             .error
             .chain()
             .enumerate()
-            .map(|(n, cause)| format!("[{n}]: {cause}, "))
-            .collect();
+            .map(|(n, cause)| format!("[{n}]: {cause}")), ",")
+            .to_string();
 
         let error_message = match value.kind {
             ErrorKind::Internal => "Unhandled error",
