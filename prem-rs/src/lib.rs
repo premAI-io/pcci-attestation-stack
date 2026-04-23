@@ -267,7 +267,7 @@ impl Client {
         nonce: &SevNonce,
         query: &QueryParams,
     ) -> Result<ParsedAttestation, AttestationError> {
-        let url = self.url.join("/attestationasev").unwrap();
+        let url = self.url.join("/attestation/sev").unwrap();
 
         let query = query.clone().with("nonce", &nonce.to_hex());
         let response = self.request(url, &query).await?.bytes().await?;
