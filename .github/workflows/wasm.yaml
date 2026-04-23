@@ -226,7 +226,7 @@ jobs:
                 rm .npmrc || true
                 npm config set @premai:registry https://registry.npmjs.org -L project
                 jq --arg name "@premai/`jq -r '.name' package.json.tmpl`" '.name = $name' package.json.tmpl > package.json
-                npm publish --access public
+                NPM_CONFIG_PROVENANCE=false npm publish --access public
 
     attestation-server:
          name: Build attestation-server docker container
