@@ -2387,9 +2387,10 @@ dependencies = [
 
 [[package]]
 name = "prem-rs"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "bytes",
+ "hex",
  "libattest",
  "nvidia-attest",
  "reqwest 0.12.28",
