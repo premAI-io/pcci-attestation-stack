@@ -5,7 +5,7 @@
     "": {
       "name": "my-app",
       "dependencies": {
-        "@premai/prem-rs": "latest",
+        "@premai/reticle": "latest",
         "node-emoji": "^2.2.0",
         "vite-plugin-wasm": "^3.5.0",
       },
@@ -26,7 +26,7 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.122.0", "", {}, "sha512-oLAl5kBpV4w69UtFZ9xqcmTi+GENWOcPF7FCrczTiBbmC0ibXxCwyvZGbO39rCVEuLGAZM84DH0pUIyyv/YJzA=="],
 
-    "@premai/prem-rs": ["@premai/prem-rs@0.2.2", "", {}, "sha512-3DgnCCJfQxKUT0pkj3xTyVMaESArVrL7kWBQGDvuJa+m9396KAhpzP16ztDoXX2dBzgwYCGtTJ0IOCsxZP1Y4Q=="],
+    "@premai/reticle": ["@premai/reticle@0.3.1", "", {}, "sha512-lOF8qVJxLlKOHxzQkPhg9zXsRif2VRzmDprNx0ppX2F5dkU6MFiOnLmyfi6sp7mO84mLJoprMP35PC8He4asSQ=="],
 
     "@rolldown/binding-android-arm64": ["@rolldown/binding-android-arm64@1.0.0-rc.12", "", { "os": "android", "cpu": "arm64" }, "sha512-pv1y2Fv0JybcykuiiD3qBOBdz6RteYojRFY1d+b95WVuzx211CRh+ytI/+9iVyWQ6koTh5dawe4S/yRfOFjgaA=="],
 
