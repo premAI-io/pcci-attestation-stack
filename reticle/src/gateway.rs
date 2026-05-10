@@ -4,7 +4,7 @@ use libattest::error::AttestationError;
 use reqwest::{IntoUrl, Response};
 use serde::{Deserialize, Serialize};
 
-use crate::{Client, query::QueryParams};
+use crate::Client;
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::wasm_bindgen;
