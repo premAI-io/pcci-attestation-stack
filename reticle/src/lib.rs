@@ -1,8 +1,9 @@
 // pub mod client;
 pub mod gateway;
+pub mod query;
 pub mod rego;
 
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
 use futures::future::{Either, OptionFuture};
 use libattest::{
@@ -11,7 +12,6 @@ use libattest::{
     validation::{Validator, WithPolicy},
 };
 use nvidia_attest::{EATToken, keychain::KeyChain, nonce::NvidiaNonce};
-use serde::Serialize;
 use snp_attest::{ParsedAttestation, kds::Kds, nonce::SevNonce};
 
 pub use nvidia_attest;
@@ -26,7 +26,7 @@ use tdx_attest::{TdxQuote, nonce::TdxNonce, pcs::Pcs, verify::QuoteVerifier};
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
-use crate::rego::PoliciesClient;
+use crate::{query::QueryParams, rego::PoliciesClient};
 
 #[cfg(feature = "debug")]
 #[cfg(target_family = "wasm")]
@@ -90,36 +90,6 @@ impl ResponseHeaders {
 pub struct NvidiaAttestResult {
     eat_token: EATToken,
     headers: ResponseHeaders,
-}
-
-/// Generic per-request query parameters.
-///
-/// The `nonce` key is reserved and will be rejected.
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
-#[derive(Clone, Serialize)]
-#[serde(transparent)]
-pub struct QueryParams(HashMap<String, String>);
-
-#[cfg_attr(target_family = "wasm", wasm_bindgen)]
-impl QueryParams {
-    #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
-    pub fn new() -> Self {
-        Self(Default::default())
-    }
-
-    /// Appends a query parameter.
-    ///
-    /// Reserved keywords for specific queries will get overwritten
-    pub fn with(mut self, key: &str, value: &str) -> Self {
-        self.0.insert(key.to_string(), value.to_string());
-        self
-    }
-}
-
-impl Default for QueryParams {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
@@ -197,6 +167,7 @@ impl ClientBuilder {
                 .expose_error()?,
             kds: self.kds,
             pcs: self.pcs,
+            query_params: QueryParams::new(),
             policy_validator: validator,
             reqwest_client,
         })
@@ -209,6 +180,8 @@ pub struct Client {
     url: Url,
     reqwest_client: reqwest::Client,
 
+    query_params: QueryParams,
+
     kds: Kds,
     pcs: Pcs,
     policy_validator: Validator,
@@ -217,16 +190,9 @@ pub struct Client {
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Client {
     /// Gather available attestable modules from remote attestation endpoint
-    pub async fn request_modules(
-        &self,
-        query: Option<QueryParams>,
-    ) -> Result<libattest::Modules, AttestationError> {
+    pub async fn request_modules(&self) -> Result<libattest::Modules, AttestationError> {
         let url = self.url.join("/attestation/modules").unwrap();
-        let response = self
-            .request(url, &query.unwrap_or_default().0)
-            .await?
-            .json()
-            .await?;
+        let response = self.request(url, &()).await?.json().await?;
 
         Ok(response)
     }
@@ -240,11 +206,10 @@ impl Client {
     pub async fn request_sev(
         &self,
         nonce: &SevNonce,
-        query: &QueryParams,
     ) -> Result<ParsedAttestation, AttestationError> {
         let url = self.url.join("/attestation/sev").unwrap();
 
-        let query = query.clone().with("nonce", &nonce.to_hex());
+        let query = [("nonce", &nonce.to_hex())];
         let response = self.request(url, &query).await?.bytes().await?;
         let attestation = ParsedAttestation::new(&response)?;
 
@@ -260,11 +225,10 @@ impl Client {
     pub async fn request_nvidia(
         &self,
         nonce: &NvidiaNonce,
-        query: &QueryParams,
     ) -> Result<NvidiaAttestResult, AttestationError> {
         let url = self.url.join("/attestation/nvidia").unwrap();
 
-        let query = query.clone().with("nonce", &nonce.to_hex());
+        let query = [("nonce", &nonce.to_hex())];
         let response = self.request(url, &query).await?;
 
         let headers = response.headers().clone();
@@ -283,13 +247,9 @@ impl Client {
     /// This method exposes core functionality and does not perform cryptographic
     /// or measurement checks on the attestation. If you want to perform end-to-end attestation
     /// please refer to [`Self::attest_tdx`]
-    pub async fn request_tdx(
-        &self,
-        nonce: &TdxNonce,
-        query: &QueryParams,
-    ) -> Result<TdxQuote, AttestationError> {
+    pub async fn request_tdx(&self, nonce: &TdxNonce) -> Result<TdxQuote, AttestationError> {
         let url = self.url.join("/attestation/tdx").unwrap();
-        let query = query.clone().with("nonce", &nonce.to_hex());
+        let query = [("nonce", &nonce.to_hex())];
 
         let response = self.request(url, &query).await?.bytes().await?;
         let quote =
@@ -299,9 +259,9 @@ impl Client {
     }
 
     /// Performs end-to-end sev-snp attestation. Generates nonce and validates claims all in one
-    pub async fn attest_sev(&self, query: Option<QueryParams>) -> Result<(), AttestationError> {
+    pub async fn attest_sev(&self) -> Result<(), AttestationError> {
         let nonce = SevNonce::generate();
-        let attestation = self.request_sev(&nonce, &query.unwrap_or_default()).await?;
+        let attestation = self.request_sev(&nonce).await?;
         let keychain = self.kds.fetch_certificates(&attestation).await?;
 
         attestation.verify(&keychain, &nonce)?;
@@ -315,10 +275,10 @@ impl Client {
     }
 
     /// Performs end-to-end tdx attestation. Generates nonce and validates claims all in one
-    pub async fn attest_tdx(&self, query: Option<QueryParams>) -> Result<(), AttestationError> {
+    pub async fn attest_tdx(&self) -> Result<(), AttestationError> {
         let nonce = TdxNonce::generate();
 
-        let quote = self.request_tdx(&nonce, &query.unwrap_or_default()).await?;
+        let quote = self.request_tdx(&nonce).await?;
         let collateral = self
             .pcs
             .fetch_collateral(&quote)
@@ -344,16 +304,11 @@ impl Client {
     }
 
     /// Completes end-to-end nvidia attestation. Generates nonce and validates claims all in one
-    pub async fn attest_nvidia(
-        &self,
-        query: Option<QueryParams>,
-    ) -> Result<ResponseHeaders, AttestationError> {
+    pub async fn attest_nvidia(&self) -> Result<ResponseHeaders, AttestationError> {
         let nonce = NvidiaNonce::generate();
         let keychain = KeyChain::fetch_keychain().await?;
 
-        let attest_result = self
-            .request_nvidia(&nonce, &query.unwrap_or_default())
-            .await?;
+        let attest_result = self.request_nvidia(&nonce).await?;
 
         let claims = attest_result.eat_token.verify(&keychain, &nonce)?;
         let claims = WithPolicy::new("nvidia.allow", claims);
@@ -370,26 +325,23 @@ impl Client {
     /// - Gathers modules to attest from attestation server
     /// - Iterates through each module and performs end-to-end attestation
     /// - Returns the list of attested modules
-    pub async fn attest(
-        &self,
-        query: Option<QueryParams>,
-    ) -> Result<AttestResult, AttestationError> {
+    pub async fn attest(&self) -> Result<AttestResult, AttestationError> {
         // get modules
         let modules = self
-            .request_modules(query.clone())
+            .request_modules()
             .await
             .context("failed to request modules from attestation server")
             .expose_error()?;
 
         let cpu_attest = match modules.cpu() {
-            CpuModule::Sev => Either::Left(self.attest_sev(query.clone())),
-            CpuModule::Tdx => Either::Right(self.attest_tdx(query.clone())),
+            CpuModule::Sev => Either::Left(self.attest_sev()),
+            CpuModule::Tdx => Either::Right(self.attest_tdx()),
             _ => bail!("we do not yet support the advertised cpu platform"),
         };
 
         let gpu_attest = match modules.gpu() {
             None => None,
-            Some(GpuModule::Nvidia) => Some(self.attest_nvidia(query.clone())),
+            Some(GpuModule::Nvidia) => Some(self.attest_nvidia()),
             _ => bail!("we do not yet support the advertised gpu platform"),
         };
         let gpu_attest = OptionFuture::from(gpu_attest);

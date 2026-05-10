@@ -4,7 +4,7 @@ use libattest::error::AttestationError;
 use reqwest::{IntoUrl, Response};
 use serde::{Deserialize, Serialize};
 
-use crate::Client;
+use crate::{Client, query::QueryParams};
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -37,7 +37,13 @@ impl Client {
         url: impl IntoUrl,
         query: &impl Serialize,
     ) -> Result<Response, AttestationError> {
-        let response = self.reqwest_client.get(url).query(query).send().await?;
+        let response = self
+            .reqwest_client
+            .get(url)
+            .query(&self.query_params)
+            .query(&query)
+            .send()
+            .await?;
 
         if !response.status().is_success() {
             response_to_error(response).await?;
