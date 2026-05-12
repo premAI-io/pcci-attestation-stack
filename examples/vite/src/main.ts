@@ -25,7 +25,7 @@ document.getElementById('attest-btn')!.addEventListener('click', async () => {
 
   let client: prem_rs.Client | undefined;
   try {
-    client = new prem_rs.ClientBuilder(url).build();
+    client = await new prem_rs.ClientBuilder(url).build();
     const modules = await client.request_modules();
     await client.attest();
     output.textContent = [
