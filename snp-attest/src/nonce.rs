@@ -3,7 +3,7 @@ use std::ops::Deref;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct SevNonce(libattest::ByteNonce<64>);
 
 impl Deref for SevNonce {

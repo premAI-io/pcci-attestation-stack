@@ -4,7 +4,7 @@ use std::ops::Deref;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct NvidiaNonce(libattest::ByteNonce<32>);
 
 impl Deref for NvidiaNonce {

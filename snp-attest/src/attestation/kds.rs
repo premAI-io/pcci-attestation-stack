@@ -1,4 +1,4 @@
-use libattest::error::{AttestationError};
+use libattest::error::AttestationError;
 use reqwest::{Client, Url};
 use sev::{Generation, firmware::host::TcbVersion};
 use x509_cert::certificate::{CertificateInner, Rfc5280};
@@ -11,7 +11,7 @@ use crate::{
     chain::{CRL, VerifiedChain},
 };
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct Kds {
     kds: Url,
 }

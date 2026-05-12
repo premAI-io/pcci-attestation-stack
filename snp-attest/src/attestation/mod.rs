@@ -5,9 +5,7 @@ pub mod kds;
 
 // pub mod nonce;
 
-use libattest::{
-    error::{AttestationError, Context, Expose},
-};
+use libattest::error::{AttestationError, Context, Expose};
 
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -21,7 +19,7 @@ use x509_parser::prelude::*;
 
 use self::chain::VerifiedChain;
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 /// Represents a parsed attestation report with some already
 /// parsed commonly accessed fields
 #[allow(unused)]
