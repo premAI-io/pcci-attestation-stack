@@ -16,7 +16,7 @@ fn parse_pem_to_cert(pem: &str) -> Result<Certificate, AttestationError> {
     Ok(certificate.into())
 }
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 #[derive(Debug, Clone)]
 /// A chain which has been cryptographically verified
 pub struct VerifiedChain(Chain);
@@ -86,17 +86,14 @@ impl VerifiedChain {
     }
 }
 
-#[cfg_attr(
-    target_family = "wasm",
-    wasm_bindgen(js_namespace = "sev", getter_with_clone)
-)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen(getter_with_clone))]
 pub struct ExportPem {
     pub ark: Vec<u8>,
     pub ask: Vec<u8>,
     pub vek: Vec<u8>,
 }
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "sev"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 /// A parsed certificate revocation list
 pub struct CRL(x509_cert::crl::CertificateList);
 

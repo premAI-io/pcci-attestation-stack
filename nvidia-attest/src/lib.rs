@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 #[derive(Serialize)]
 pub struct DecodedClaims {
     overall_claims: OverallClaims,
@@ -32,7 +32,7 @@ pub struct DecodedClaims {
 }
 
 #[derive(PartialEq, Debug)]
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct EATToken {
     overall: String,
     gpu: HashMap<String, String>,

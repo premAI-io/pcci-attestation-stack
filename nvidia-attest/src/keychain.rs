@@ -10,7 +10,7 @@ use reqwest::Url;
 static NVIDIA_NRAS: LazyLock<Url> =
     LazyLock::new(|| Url::parse("https://nras.attestation.nvidia.com").unwrap());
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 pub struct KeyChain(jwk::JwkSet);
 
 impl KeyChain {
@@ -22,7 +22,7 @@ impl KeyChain {
     }
 }
 
-#[cfg_attr(target_family = "wasm", wasm_bindgen(js_namespace = "nvidia"))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 /// Same as [`KeyChain:fetch_keychain`], put in for better wasm compatibility
 pub async fn fetch_keychain() -> Result<KeyChain, AttestationError> {
     KeyChain::fetch_keychain().await
