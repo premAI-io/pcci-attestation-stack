@@ -5,7 +5,7 @@
     "": {
       "name": "bun",
       "dependencies": {
-        "@premai/prem-rs": "latest",
+        "@premai/reticle": "latest",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -16,7 +16,7 @@
     },
   },
   "packages": {
-    "@premai/prem-rs": ["@premai/prem-rs@0.2.2", "", {}, "sha512-3DgnCCJfQxKUT0pkj3xTyVMaESArVrL7kWBQGDvuJa+m9396KAhpzP16ztDoXX2dBzgwYCGtTJ0IOCsxZP1Y4Q=="],
+    "@premai/reticle": ["@premai/reticle@0.3.1", "", {}, "sha512-lOF8qVJxLlKOHxzQkPhg9zXsRif2VRzmDprNx0ppX2F5dkU6MFiOnLmyfi6sp7mO84mLJoprMP35PC8He4asSQ=="],
 
     "@types/bun": ["@types/bun@1.3.11", "", { "dependencies": { "bun-types": "1.3.11" } }, "sha512-5vPne5QvtpjGpsGYXiFyycfpDF2ECyPcTSsFBMa0fraoxiQyMJ3SmuQIGhzPg2WJuWxVBoxWJ2kClYTcw/4fAg=="],
 
