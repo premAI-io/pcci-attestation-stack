@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="reticle app icon">
+  <title>reticle</title>
+  <desc>Private compute attestation. Orange chip with checkmark, framed by viewfinder reticle brackets.</desc>
+
+  <!-- Reticle viewfinder corner brackets -->
+  <g stroke="#6e3211" stroke-width="8" stroke-linecap="round" fill="none">
+    <path d="M 120 218 L 120 120 L 218 120"/>
+    <path d="M 806 120 L 904 120 L 904 218"/>
+    <path d="M 120 806 L 120 904 L 218 904"/>
+    <path d="M 806 904 L 904 904 L 904 806"/>
+  </g>
+
+  <!-- Chip pins -->
+  <g stroke="#ef7a37" stroke-width="22" stroke-linecap="round">
+    <!-- Top -->
+    <line x1="429" y1="256" x2="429" y2="338"/>
+    <line x1="512" y1="241" x2="512" y2="338"/>
+    <line x1="595" y1="256" x2="595" y2="338"/>
+    <!-- Bottom -->
+    <line x1="429" y1="685" x2="429" y2="767"/>
+    <line x1="512" y1="685" x2="512" y2="782"/>
+    <line x1="595" y1="685" x2="595" y2="767"/>
+    <!-- Left -->
+    <line x1="256" y1="429" x2="338" y2="429"/>
+    <line x1="241" y1="512" x2="338" y2="512"/>
+    <line x1="256" y1="595" x2="338" y2="595"/>
+    <!-- Right -->
+    <line x1="685" y1="429" x2="767" y2="429"/>
+    <line x1="685" y1="512" x2="782" y2="512"/>
+    <line x1="685" y1="595" x2="767" y2="595"/>
+  </g>
+
+  <!-- Chip body -->
+  <rect x="332" y="332" width="361" height="361" rx="48" fill="#2a1208" stroke="#ef7a37" stroke-width="13"/>
+
+  <!-- Inner CPU die outline -->
+  <rect x="395" y="395" width="234" height="234" rx="24" fill="none" stroke="#ef7a37" stroke-width="4.5" opacity="0.55"/>
+
+  <!-- Status LED indicator -->
+  <circle cx="678" cy="346" r="24" fill="#ef7a37"/>
+
+  <!-- Checkmark -->
+  <path d="M 429 527 L 492 590 L 602 459" fill="none" stroke="#f9a36b" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
