@@ -2800,7 +2800,6 @@ dependencies = [
  "console_error_panic_hook",
  "futures",
  "hex",
- "js-sys",
  "libattest",
  "nvidia-attest",
  "reqwest 0.12.28",

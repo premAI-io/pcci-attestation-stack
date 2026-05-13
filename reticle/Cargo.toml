@@ -21,7 +21,6 @@ serde = { version = "1.0.228", features = ["derive"] }
 hex = "0.4.3"
 futures = "0.3.32"
 web-sys = { version = "0.3.98", features = ["Request", "RequestInit"] }
-js-sys = "0.3.98"
 async-once-cell = "0.5.4"
 
 [dev-dependencies]

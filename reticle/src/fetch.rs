@@ -6,7 +6,7 @@ use libattest::{
 use reqwest::Url;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::Request;
+use web_sys::{Request, js_sys::Promise};
 
 #[wasm_bindgen]
 extern "C" {
@@ -14,16 +14,16 @@ extern "C" {
     fn log(s: &str);
 
     #[wasm_bindgen(js_namespace = globalThis, js_name = fetch)]
-    fn js_fetch(input: &JsValue) -> js_sys::Promise;
+    fn js_fetch(input: &JsValue) -> Promise;
 
     #[wasm_bindgen(js_namespace = globalThis, js_name = fetch)]
-    fn js_fetch_with_init(input: &JsValue, init: &JsValue) -> js_sys::Promise;
+    fn js_fetch_with_init(input: &JsValue, init: &JsValue) -> Promise;
 }
 
 #[wasm_bindgen(module = "/src/fetchShim.js")]
 extern "C" {
     #[wasm_bindgen(catch)]
-    fn realFetch(input: &JsValue, init: Option<JsValue>) -> Result<js_sys::Promise, JsValue>;
+    fn realFetch(input: &JsValue, init: Option<JsValue>) -> Result<Promise, JsValue>;
 }
 
 static FETCH_CLIENT: OnceCell<crate::Client> = OnceCell::new();
