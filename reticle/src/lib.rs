@@ -1,4 +1,6 @@
 // pub mod client;
+#[cfg(target_family = "wasm")]
+pub mod fetch;
 pub mod gateway;
 pub mod query;
 pub mod rego;
